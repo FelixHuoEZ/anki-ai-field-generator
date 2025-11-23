@@ -23,6 +23,8 @@ Compared with the upstream project, this fork adds:
 - This plugin allows you to use Large Language Models (LLMs) to add information to your Anki flashcards using the power of AI.
 - Supports Claude (Anthropic), ChatGPT (OpenAI), Gemini (Google), and Deepseek models.
 - Optional text-to-speech pipeline that fills audio fields with `[sound:]` tags generated via OpenAI or Gemini TTS.
+- YouGlish/OAAD link helpers: map a source field (default `_word`) to target fields (default `_youglish`/`_oaad`) and batch-generate links from the browser menu or during runs; supports per-config accents and overwrite behavior.
+- Auto-run new notes: when “Auto Run on New Notes” is enabled, newly added cards queue up for the same generation flow and can run silently in the background.
 - Completely free! (You create your own API key and pay for LLM usage)
 
 ## Quickstart:
@@ -31,12 +33,177 @@ Compared with the upstream project, this fork adds:
 1. You have a new menu option: Anki AI -> Update Your Flashcards with AI
 1. Pick the configuration you want to run (or click **Manage…** to edit profiles), then review the prompts/mappings before launching.
 
+### Sample Card Template (Front/Back + Styling)
+
+Front:
+
+```html
+<div class="word big">{{_wordAudio}}{{_word}}</div>
+```
+
+Back:
+
+```html
+{{FrontSide}}
+<hr id="answer">
+
+{{#_phonType}}<div class="meta">{{_phonType}}{{#_phonetic}} · {{_phonetic}}{{/_phonetic}}</div>{{/_phonType}}
+
+{{#_wordTran}}<div class="zh">{{_wordTran}}</div>{{/_wordTran}}
+{{#_definition}}<div class="def">{{_definition}}</div>{{/_definition}}
+
+<!-- OAAD / Youglish link area (full URL version) -->
+{{#_oaad}}<div class="link"><a href="{{_oaad}}" target="_blank" rel="noopener">OAAD</a></div>{{/_oaad}}
+{{#_youglish}}<div class="link"><a href="{{_youglish}}" target="_blank" rel="noopener">Youglish</a></div>{{/_youglish}}
+
+{{#_sentenceMarked}}<div class="sentence">{{_sentenceAudio}}{{_sentenceMarked}}</div>{{/_sentenceMarked}}
+{{#_sentenceTran}}<div class="tr">{{_sentenceTran}}</div>{{/_sentenceTran}}
+
+{{#_examplesOrig}}
+<div class="ex">
+  {{_examplesOrig}}
+  {{#_examplesTran}}<div class="ex-tr">{{_examplesTran}}</div>{{/_examplesTran}}
+</div>
+{{/_examplesOrig}}
+
+{{#_notes}}<div class="notes">{{_notes}}</div>{{/_notes}}
+
+{{#_image}}{{_image}}{{/_image}}
+```
+
+Styling:
+
+```css
+/* Card wrapper */
+.card {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 22px;
+  line-height: 1.6;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 18px 22px;
+  background: #fdfdfd;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  text-align: left;
+}
+
+/* Answer separator */
+#answer {
+  margin: 12px 0 18px;
+  border: none;
+  border-top: 1px solid #e3e3e3;
+}
+
+/* Main word */
+.word.big {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+/* Meta info */
+.meta {
+  font-size: 16px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+/* Shared spacing */
+.zh,
+.def,
+.ex,
+.notes {
+  margin: 8px 0;
+}
+
+.zh {
+  font-weight: 600;
+  color: #333;
+}
+
+.def {
+  color: #444;
+  padding-left: 10px;
+  border-left: 3px solid #e3e3e3;
+}
+
+.sentence {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  background: #f7faff;
+  border-radius: 6px;
+}
+
+.tr {
+  color: #666;
+  margin: 4px 0 10px;
+  font-size: 0.9em;
+}
+
+.ex {
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 6px;
+  border-left: 3px solid #eee;
+}
+
+.ex-tr {
+  color: #777;
+  margin-top: 4px;
+  margin-left: 0;
+  font-size: 0.9em;
+}
+
+.notes {
+  padding: 8px 10px;
+  background: #fffaf0;
+  border-radius: 6px;
+  border-left: 3px solid #ffdd99;
+  font-size: 0.9em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  margin: 10px 0;
+}
+
+.link {
+  margin: 6px 0;
+  font-size: 0.9em;
+}
+
+.link a {
+  text-decoration: none;
+  border-bottom: 1px dashed #999;
+}
+
+.link a:hover {
+  border-bottom-style: solid;
+}
+
+@media (max-width: 480px) {
+  .card {
+    font-size: 20px;
+    padding: 14px 16px;
+  }
+  .word.big {
+    font-size: 28px;
+  }
+}
+```
+
 ### Configuration Profiles
 
 - Open **Manage…** from the run window (or Tools → Anki AI → Manage Configurations) to edit profiles stored in `config.json`.
 - Each profile can target specific note types. When selected cards fall outside the active profile, the run dialog and a warning popup prompt you to switch before generating content.
 - Text, image, and speech generation now store separate provider/model choices. Use the drop-downs inside each section to pick OpenAI, Anthropic, Gemini, DeepSeek, or a custom endpoint.
 - The runtime dialog reuses the same sections as the configuration manager—retry policy, text mappings, image prompts, and speech prompts—so what you preview while editing is exactly what you run.
+- Switching providers in either window applies the same defaults (endpoint/model/voice/format) so the runtime and configuration manager stay in sync.
+- YouGlish/OAAD setup: configure source/target fields and accent; browser menus offer “Open/Update YouGlish/OAAD Link” shortcuts, and batch runs will write links automatically.
+- Auto-run new notes: check “Automatically run on newly added notes” to enqueue fresh cards into the background batch (optionally silent).
 
 ## Detailed Setup:
 
@@ -142,43 +309,45 @@ In our example, the LLM returns:
 
 </details>
 
+> Tip: At runtime every mapped key must exist in the model response. Missing keys cause that note to be skipped and logged to `anki_ai_runtime.log`; the batch continues without crashing.
+
 <details>
 <summary><b>Optional: Generate audio from your fields</b></summary>
 <br/>
 Use the <em>Speech Generation Mapping</em> section in the settings dialog to map a source text field to the card field that should receive the audio tag. When the source field has content, the plugin calls the configured speech endpoint (OpenAI by default, Gemini when you select a Gemini TTS model) and stores the resulting file in Anki's media folder with a <code>[sound:...]</code> tag.
 
 - Provide a speech API key dedicated to audio requests; the plugin does not reuse your main LLM key.
-- Defaults target OpenAI (<code>gpt-4o-mini-tts</code>, <code>alloy</code>, <code>mp3</code>). To switch to Google Gemini, set the audio model (and optionally override the voice) to match your Gemini setup（如 <code>gemini-2.5-flash-preview-tts</code>），系统默认使用 <code>Kore</code> 音色。
-- Gemini 语音接口目前仅返回 24kHz 线性 PCM，我们会自动封装为 <code>.wav</code> 文件；请把音频格式字段设置为 <code>wav</code>（或留空，插件会回落到 <code>wav</code>）。
+- Defaults target OpenAI (<code>gpt-4o-mini-tts</code>, <code>alloy</code>, <code>mp3</code>). To switch to Google Gemini, set the audio model (and optionally override the voice) to your Gemini setup (e.g., <code>gemini-2.5-flash-preview-tts</code>); the default voice is <code>Kore</code>.
+- Gemini TTS currently returns 24kHz linear PCM; the plugin wraps it as <code>.wav</code>. Set the audio format field to <code>wav</code> (or leave blank to fall back to <code>wav</code>).
 - The first field in each mapping provides the text to be spoken; the second field receives only the generated <code>[sound:...]</code> tag.
 - Existing field contents are preserved; the new audio tag is appended on a new line if needed.
-- Advanced: 在 Settings 底部可以设置 “Retry Attempts” 与 “初始 Retry Delay (秒)”（默认 50 / 5），用于控制文本、图片、语音阶段的自动重试策略。重试间隔会按 10 次为一组逐步翻倍，例如起始 5 秒 → 第 1–10 次等待 5 秒 → 第 11–20 次等待 10 秒，以此类推。
+- Advanced: at the bottom of Settings you can set “Retry Attempts” and “Initial Retry Delay (seconds)” (default 50 / 5) to control automatic retries for text/image/audio; the delay doubles every 10 attempts (5s for attempts 1–10, 10s for 11–20, etc.).
 
 <details>
-<summary><b>Gemini 2.5 预设音色（2025-09-30 更新）</b></summary>
+<summary><b>Gemini 2.5 preset voices (2025-09-30)</b></summary>
 <br/>
-Zephyr — Bright；Puck — Upbeat；Charon — Informative；Kore — Firm；Fenrir — Excitable；Leda — Youthful；Orus — Firm；Aoede — Breezy；Callirrhoe — Easy-going；Autonoe — Bright；Enceladus — Breathy；Iapetus — Clear；Umbriel — Easy-going；Algieba — Smooth；Despina — Smooth；Erinome — Clear；Algenib — Gravelly；Rasalgethi — Informative；Laomedeia — Upbeat；Achernar — Soft；Alnilam — Firm；Schedar — Even；Gacrux — Mature；Pulcherrima — Forward；Achird — Friendly；Zubenelgenubi — Casual；Vindemiatrix — Gentle；Sadachbia — Lively；Sadaltager — Knowledgeable；Sulafat — Warm。
+Zephyr — Bright; Puck — Upbeat; Charon — Informative; Kore — Firm; Fenrir — Excitable; Leda — Youthful; Orus — Firm; Aoede — Breezy; Callirrhoe — Easy-going; Autonoe — Bright; Enceladus — Breathy; Iapetus — Clear; Umbriel — Easy-going; Algieba — Smooth; Despina — Smooth; Erinome — Clear; Algenib — Gravelly; Rasalgethi — Informative; Laomedeia — Upbeat; Achernar — Soft; Alnilam — Firm; Schedar — Even; Gacrux — Mature; Pulcherrima — Forward; Achird — Friendly; Zubenelgenubi — Casual; Vindemiatrix — Gentle; Sadachbia — Lively; Sadaltager — Knowledgeable; Sulafat — Warm.
 
 </details>
 
 Run the add-on again whenever you want to refresh the audio files after changing settings.
 
-<em>Live verification</em>: 若需实际走通 Gemini TTS，可在仓库根目录运行 `python -m tests.speech.run_gemini_tts_sample`，或在设置了 `GEMINI_API_KEY` 与 `RUN_GEMINI_TTS_LIVE_TEST=1` 后执行 `python -m unittest tests.speech.live_gemini_tts_test`。
+<em>Live verification</em>: To sanity-check Gemini TTS locally, run `python -m tests.speech.run_gemini_tts_sample`, or set `GEMINI_API_KEY` and `RUN_GEMINI_TTS_LIVE_TEST=1` then execute `python -m unittest tests.speech.live_gemini_tts_test`.
 </details>
 
-### Google 模型与 Endpoint 速查
+### Google models & endpoint quick reference
 
-| 用途 | 模型名称 | 特点摘要 | REST Endpoint 示例 |
+| Purpose | Model | Summary | REST Endpoint Example |
 | --- | --- | --- | --- |
-| 图像 | `gemini-2.5-flash-image` | 正式发布的 2.5 Flash 图像模型，追求高吞吐和快速响应，默认 1024×1024 输出 | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent` |
-| 图像 | `gemini-2.5-flash-image-preview` | 预览通道，提供实验性改进（更细节/更多控制参数），接口和配额尚在调整中 | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent` |
-| 图像 | `imagen-4.0-generate-001` | Imagen 4 标准档，写实与插画均衡，支持高分辨率（最高 2048×2048） | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:generateContent` |
-| 图像 | `imagen-4.0-ultra-generate-001` | Imagen 4 Ultra，高保真写实效果、对复杂场景表现更好，耗时/成本相对更高 | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-ultra-generate-001:generateContent` |
-| 图像 | `imagen-4.0-fast-generate-001` | Imagen 4 Fast，牺牲部分细节换取最低延迟与成本，适合草稿或批量生成 | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:generateContent` |
-| 语音 | `gemini-2.5-flash-preview-tts` | Flash 语音预览，主打低延迟/实时互动，输出 24kHz PCM（插件会封装为 WAV） | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent` |
-| 语音 | `gemini-2.5-pro-preview-tts` | Pro 语音预览，强调自然度和长文本表现，延迟略高 | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent` |
+| Image | `gemini-2.5-flash-image` | Stable 2.5 Flash image model focused on throughput/latency; default 1024×1024 output | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent` |
+| Image | `gemini-2.5-flash-image-preview` | Preview channel with experimental improvements (more detail/control); endpoints/quotas may change | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent` |
+| Image | `imagen-4.0-generate-001` | Imagen 4 standard tier; balances realism and illustration; supports up to 2048×2048 | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:generateContent` |
+| Image | `imagen-4.0-ultra-generate-001` | Imagen 4 Ultra; higher fidelity for complex scenes; higher cost/latency | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-ultra-generate-001:generateContent` |
+| Image | `imagen-4.0-fast-generate-001` | Imagen 4 Fast; trades detail for lowest latency/cost; good for drafts/batches | `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:generateContent` |
+| Audio | `gemini-2.5-flash-preview-tts` | Flash TTS preview emphasizing low latency/interactive use; outputs 24kHz PCM (wrapped as WAV) | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent` |
+| Audio | `gemini-2.5-pro-preview-tts` | Pro TTS preview focusing on naturalness/long-form quality; slightly higher latency | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent` |
 
-> 说明：以上均基于 Google Generative Language REST API。若在设置中手动覆盖 Endpoint，请确保最终 URL 形如 `.../models/<MODEL>:generateContent`。图像调用需在请求体中设置 `"responseModalities": ["IMAGE"]`，语音则使用 `"responseModalities": ["AUDIO"]` 或附带 `speechConfig`。
+> Note: All endpoints use Google Generative Language REST API. If you override the endpoint, ensure the URL ends with `.../models/<MODEL>:generateContent`. Image calls must set `"responseModalities": ["IMAGE"]`; audio calls should set `"responseModalities": ["AUDIO"]` or include `speechConfig`.
 
 ## FAQ:
 
