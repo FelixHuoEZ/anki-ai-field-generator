@@ -162,12 +162,29 @@ class ClientFactory:
         return True
 
     def show(self):
-        self.window = MainWindow(self, lambda: self.on_submit(self.browser, self.notes))
+        self.window = MainWindow(
+            self,
+            lambda overwrite_this_run=False, protected_fields_this_run=None: self.on_submit(
+                self.browser,
+                self.notes,
+                overwrite_this_run=overwrite_this_run,
+                protected_fields_this_run=protected_fields_this_run or [],
+            ),
+        )
         self.window.show()
 
     # Submission -------------------------------------------------------
 
-    def on_submit(self, browser, notes, *, suppress_front: bool = False, silent: bool = False):
+    def on_submit(
+        self,
+        browser,
+        notes,
+        *,
+        suppress_front: bool = False,
+        silent: bool = False,
+        overwrite_this_run: bool = False,
+        protected_fields_this_run: Optional[list[str]] = None,
+    ):
         generate_text = self._get_bool_setting(SettingsNames.ENABLE_TEXT_GENERATION_SETTING_NAME)
         generate_images = self._get_bool_setting(SettingsNames.ENABLE_IMAGE_GENERATION_SETTING_NAME)
         generate_audio = self._get_bool_setting(SettingsNames.ENABLE_AUDIO_GENERATION_SETTING_NAME)
@@ -181,6 +198,8 @@ class ClientFactory:
             generate_text=generate_text,
             generate_images=generate_images,
             generate_audio=generate_audio,
+            overwrite_this_run=overwrite_this_run,
+            protected_fields_this_run=protected_fields_this_run or [],
         )
         def on_success() -> None:
             if self.window:
@@ -402,6 +421,14 @@ class ClientFactory:
         self.app_settings.setValue(
             SettingsNames.SCHEDULE_NOTICE_SECONDS_SETTING_NAME,
             config.schedule_notice_seconds,
+        )
+        self.app_settings.setValue(
+            SettingsNames.FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME,
+            config.field_overwrite_by_config,
+        )
+        self.app_settings.setValue(
+            SettingsNames.FIELD_PROTECTED_FIELDS_SETTING_NAME,
+            config.field_protected_fields or "",
         )
 
     def _build_note_type_lookup(self) -> Dict[str, str]:

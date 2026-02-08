@@ -59,6 +59,8 @@ class SettingsNames:
     SCHEDULE_NOTICE_SECONDS_SETTING_NAME = "schedule_notice_seconds"
     SCHEDULE_NEXT_RUN_TS_SETTING_NAME = "schedule_next_run_ts"
     SCHEDULE_DAILY_COUNT_SETTING_NAME = "schedule_daily_count"
+    FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME = "field_overwrite_by_config"
+    FIELD_PROTECTED_FIELDS_SETTING_NAME = "field_protected_fields"
     AUTO_QUEUE_SILENT_SETTING_NAME = "auto_queue_silent"
     AUTO_QUEUE_DISPLAY_FIELD = "auto_queue_display_field"
     AUTO_QUEUE_LAST_STATUS = "auto_queue_last_status"

@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QToolButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -32,7 +33,12 @@ except Exception:  # pragma: no cover - tests without Anki
     mw = None  # type: ignore
 
 from ..config.config_store import ConfigStore, LLMConfig
-from .mapping_sections import GenerationSection, RetrySection, ToggleMappingEditor
+from .mapping_sections import (
+    FieldChecklist,
+    GenerationSection,
+    RetrySection,
+    ToggleMappingEditor,
+)
 from ..providers.provider_defaults import apply_provider_defaults, reset_button_enabled
 from ..providers.provider_options import (
     AUDIO_PROVIDERS,
@@ -136,6 +142,7 @@ class ConfigManagerDialog(QDialog):
         self._current_name: Optional[str] = None
         self._initial_selection: Optional[str] = selected_config
         self._note_types = self._load_note_types()
+        self._note_type_fields = self._load_note_type_fields()
         self._current_text_provider: str = ""
         self._current_image_provider: str = ""
         self._current_audio_provider: str = ""
@@ -254,6 +261,47 @@ class ConfigManagerDialog(QDialog):
         editor_layout.addWidget(self.retry_section)
         # align YouGlish group font with retry section for consistency
         # the group is created later; adjust after creation below
+
+        self.field_update_group, field_update_form = self._create_titled_group(
+            "Field update strategy"
+        )
+        field_update_hint = QLabel("Default strategy: Fill Empty Only")
+        field_update_hint.setWordWrap(True)
+        field_update_form.addRow(field_update_hint)
+        self.field_overwrite_by_config_checkbox = QCheckBox(
+            "Overwrite existing values by default (Permanent)"
+        )
+        field_update_form.addRow(self.field_overwrite_by_config_checkbox)
+        self.field_protected_fields_toggle = QToolButton()
+        self.field_protected_fields_toggle.setText("Protected fields")
+        self.field_protected_fields_toggle.setCheckable(True)
+        self.field_protected_fields_toggle.setChecked(False)
+        self.field_protected_fields_toggle.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.field_protected_fields_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self.field_protected_fields_toggle.toggled.connect(
+            self._toggle_protected_fields_panel
+        )
+        self.field_protected_fields_selector = FieldChecklist([], visible_rows=10)
+        self.field_protected_fields_panel = QWidget()
+        field_protected_layout = QVBoxLayout(self.field_protected_fields_panel)
+        field_protected_layout.setContentsMargins(0, 0, 0, 0)
+        permanent_box = QGroupBox("Permanent (Advanced: modify with caution)")
+        permanent_layout = QVBoxLayout(permanent_box)
+        permanent_layout.setContentsMargins(8, 8, 8, 8)
+        permanent_layout.addWidget(self.field_protected_fields_selector)
+        field_protected_layout.addWidget(permanent_box)
+        self.field_protected_fields_panel.setVisible(False)
+
+        protected_container = QWidget()
+        protected_container_layout = QVBoxLayout(protected_container)
+        protected_container_layout.setContentsMargins(0, 0, 0, 0)
+        protected_container_layout.setSpacing(6)
+        protected_container_layout.addWidget(self.field_protected_fields_toggle)
+        protected_container_layout.addWidget(self.field_protected_fields_panel)
+        field_update_form.addRow(protected_container)
+        editor_layout.addWidget(self.field_update_group)
 
         # Text generation section
         self.text_mapping_editor = ToggleMappingEditor(
@@ -504,6 +552,9 @@ class ConfigManagerDialog(QDialog):
     def _install_dirty_watchers(self) -> None:
         self.name_input.textChanged.connect(self._on_form_modified)
         self.note_type_selector.list_widget.itemChanged.connect(self._on_form_modified)
+        self.note_type_selector.list_widget.itemChanged.connect(
+            self._on_note_type_selection_changed
+        )
 
         self.retry_section.retry_limit_input.textChanged.connect(self._on_form_modified)
         self.retry_section.retry_delay_input.textChanged.connect(self._on_form_modified)
@@ -525,6 +576,10 @@ class ConfigManagerDialog(QDialog):
         self.schedule_batch_size_input.valueChanged.connect(self._on_form_modified)
         self.schedule_daily_limit_input.valueChanged.connect(self._on_form_modified)
         self.schedule_notice_seconds_input.valueChanged.connect(self._on_form_modified)
+        self.field_overwrite_by_config_checkbox.stateChanged.connect(self._on_form_modified)
+        self.field_protected_fields_selector.selectionChanged.connect(
+            self._on_form_modified
+        )
 
         self.endpoint_input.textChanged.connect(self._on_form_modified)
         self.model_input.textChanged.connect(self._on_form_modified)
@@ -567,6 +622,55 @@ class ConfigManagerDialog(QDialog):
         note_types.sort(key=lambda item: item[1].lower())
         return note_types
 
+    def _load_note_type_fields(self) -> dict[str, list[str]]:
+        if mw is None or getattr(mw, "col", None) is None:
+            return {}
+        try:
+            models = mw.col.models.all()  # type: ignore[union-attr]
+        except Exception:
+            return {}
+        fields_by_type: dict[str, list[str]] = {}
+        for model in models:
+            model_id = str(model.get("id") or "")
+            if not model_id:
+                continue
+            names: list[str] = []
+            for field in model.get("flds", []):
+                name = str(field.get("name", "")).strip()
+                if name:
+                    names.append(name)
+            fields_by_type[model_id] = sorted(set(names), key=lambda value: value.lower())
+        return fields_by_type
+
+    def _available_fields_for_note_types(
+        self,
+        note_type_ids: Iterable[str],
+        extra_fields: Optional[Iterable[str]] = None,
+    ) -> list[str]:
+        selected = {str(note_type_id) for note_type_id in note_type_ids if str(note_type_id)}
+        if not selected:
+            selected = set(self._note_type_fields.keys())
+        combined: set[str] = {str(field).strip() for field in (extra_fields or []) if str(field).strip()}
+        for note_type_id in selected:
+            combined.update(self._note_type_fields.get(note_type_id, []))
+        return sorted(combined, key=lambda value: value.lower())
+
+    def _refresh_protected_field_options(
+        self,
+        selected_fields: Optional[Iterable[str]] = None,
+    ) -> None:
+        current_selected = (
+            list(selected_fields)
+            if selected_fields is not None
+            else self.field_protected_fields_selector.selected_fields()
+        )
+        available = self._available_fields_for_note_types(
+            self.note_type_selector.selected_ids(),
+            current_selected,
+        )
+        self.field_protected_fields_selector.set_fields(available)
+        self.field_protected_fields_selector.set_selected_fields(list(current_selected))
+
     def _is_active_config(self, name: str) -> bool:
         return bool(name and name == (self._active_config_name or ""))
 
@@ -595,6 +699,17 @@ class ConfigManagerDialog(QDialog):
         if self._loading:
             return
         self._mark_dirty()
+
+    def _on_note_type_selection_changed(self, *args: object) -> None:
+        if self._loading:
+            return
+        self._refresh_protected_field_options()
+
+    def _toggle_protected_fields_panel(self, expanded: bool) -> None:
+        self.field_protected_fields_toggle.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        )
+        self.field_protected_fields_panel.setVisible(expanded)
 
     def _mark_dirty(self) -> None:
         self._dirty = self._capture_form_state() != self._form_snapshot
@@ -652,6 +767,10 @@ class ConfigManagerDialog(QDialog):
             "schedule_batch_size": self.schedule_batch_size_input.value(),
             "schedule_daily_limit": self.schedule_daily_limit_input.value(),
             "schedule_notice_seconds": self.schedule_notice_seconds_input.value(),
+            "field_overwrite_by_config": self.field_overwrite_by_config_checkbox.isChecked(),
+            "field_protected_fields": tuple(
+                self.field_protected_fields_selector.selected_fields()
+            ),
             "auto_queue_display_field": self.auto_queue_display_field_input.text().strip(),
             "auto_queue_silent": self.auto_queue_silent_checkbox.isChecked(),
             "oaad_enabled": self.oaad_enable_checkbox.isChecked(),
@@ -787,6 +906,11 @@ class ConfigManagerDialog(QDialog):
         self.schedule_batch_size_input.setValue(config.schedule_batch_size or 5)
         self.schedule_daily_limit_input.setValue(config.schedule_daily_limit or 30)
         self.schedule_notice_seconds_input.setValue(config.schedule_notice_seconds or 30)
+        self.field_overwrite_by_config_checkbox.setChecked(
+            bool(config.field_overwrite_by_config)
+        )
+        protected_fields = self._parse_csv_fields(config.field_protected_fields or "")
+        self._refresh_protected_field_options(protected_fields)
         self.auto_queue_display_field_input.setText(config.auto_queue_display_field or "")
         self.auto_queue_silent_checkbox.setChecked(bool(config.auto_queue_silent))
         self.oaad_enable_checkbox.setChecked(bool(config.oaad_enabled))
@@ -814,6 +938,30 @@ class ConfigManagerDialog(QDialog):
             enabled = bool(entry.get("enabled", True))
             decoded.append((key, field, enabled))
         return decoded
+
+    @staticmethod
+    def _parse_csv_fields(raw: str) -> list[str]:
+        parts = [part.strip() for part in str(raw or "").split(",")]
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for part in parts:
+            if not part or part in seen:
+                continue
+            seen.add(part)
+            deduped.append(part)
+        return deduped
+
+    @staticmethod
+    def _join_csv_fields(fields: Iterable[str]) -> str:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for field in fields:
+            value = str(field).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+        return ",".join(normalized)
 
     def _collect_form(self) -> Optional[LLMConfig]:
         name = self.name_input.text().strip()
@@ -915,6 +1063,10 @@ class ConfigManagerDialog(QDialog):
             schedule_batch_size=self.schedule_batch_size_input.value(),
             schedule_daily_limit=self.schedule_daily_limit_input.value(),
             schedule_notice_seconds=self.schedule_notice_seconds_input.value(),
+            field_overwrite_by_config=self.field_overwrite_by_config_checkbox.isChecked(),
+            field_protected_fields=self._join_csv_fields(
+                self.field_protected_fields_selector.selected_fields()
+            ),
             auto_queue_display_field=self.auto_queue_display_field_input.text().strip(),
             auto_queue_silent=self.auto_queue_silent_checkbox.isChecked(),
             oaad_enabled=self.oaad_enable_checkbox.isChecked(),
@@ -1372,6 +1524,14 @@ class ConfigManagerDialog(QDialog):
         )
         settings.setValue(SettingsNames.RETRY_LIMIT_SETTING_NAME, config.retry_limit)
         settings.setValue(SettingsNames.RETRY_DELAY_SETTING_NAME, config.retry_delay)
+        settings.setValue(
+            SettingsNames.FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME,
+            config.field_overwrite_by_config,
+        )
+        settings.setValue(
+            SettingsNames.FIELD_PROTECTED_FIELDS_SETTING_NAME,
+            config.field_protected_fields or "",
+        )
         settings.setValue(SettingsNames.IMAGE_MAPPING_SETTING_NAME, config.image_prompt_mappings)
         image_provider = (config.image_provider or "custom").lower()
         image_api_key = config.image_provider_api_keys.get(image_provider, config.image_api_key)

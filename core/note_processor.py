@@ -76,6 +76,8 @@ class NoteProcessor(QThread):
         generate_audio: bool = True,
         generate_youglish: bool = True,
         generate_oaad: bool = True,
+        overwrite_this_run: bool = False,
+        protected_fields_this_run: Optional[list[str]] = None,
         missing_field_is_error: bool = False,
     ) -> None:
         super().__init__()
@@ -230,6 +232,23 @@ class NoteProcessor(QThread):
             self.settings,
             SettingsNames.OAAD_OVERWRITE_SETTING_NAME,
             default=False,
+        )
+        self._overwrite_by_config = self._get_bool_setting(
+            self.settings,
+            SettingsNames.FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME,
+            default=False,
+        )
+        self._overwrite_this_run = bool(overwrite_this_run)
+        self._protected_fields_config = self._parse_protected_fields(
+            self.settings.value(
+                SettingsNames.FIELD_PROTECTED_FIELDS_SETTING_NAME,
+                defaultValue="",
+                type=str,
+            )
+            or ""
+        )
+        self._protected_fields_this_run = self._parse_protected_fields(
+            ",".join(protected_fields_this_run or [])
         )
         self._generate_oaad = generate_oaad
         mappings = settings.value(
@@ -443,38 +462,45 @@ class NoteProcessor(QThread):
                     self.current_index += 1
                     continue
 
-                text_fields = list(text_new_values.keys())
-                note, conflicts = self._check_for_conflicts(
-                    note,
-                    "text",
-                    text_fields,
-                    text_new_values,
-                )
-                self.notes[self.current_index] = note
-                skip_text = False
-                if conflicts:
-                    decision = self._wait_for_conflict_resolution(
-                        note.id,
+                writable_text_values: dict[str, Any] = {}
+                for field_name, value in text_new_values.items():
+                    current_value = note[field_name] if field_name in note else ""
+                    if self._should_write_field(field_name, current_value):
+                        writable_text_values[field_name] = value
+
+                text_fields = list(writable_text_values.keys())
+                if text_fields:
+                    note, conflicts = self._check_for_conflicts(
+                        note,
                         "text",
-                        conflicts,
+                        text_fields,
+                        writable_text_values,
                     )
-                    if decision == "skip":
-                        skip_text = True
-                        self._update_snapshot_section(note, "text", text_fields)
-                    elif decision == "abort":
-                        self._emit_plain_error("Processing cancelled by user.")
-                        return
-                if not skip_text:
-                    for field_name, value in text_new_values.items():
-                        note[field_name] = value
-                    try:
-                        self._commit_note_sections(
-                            note,
-                            [("text", text_fields)],
+                    self.notes[self.current_index] = note
+                    skip_text = False
+                    if conflicts:
+                        decision = self._wait_for_conflict_resolution(
+                            note.id,
+                            "text",
+                            conflicts,
                         )
-                    except ExternalException as exc:
-                        self._emit_stage_error("Saving text fields", exc)
-                        return
+                        if decision == "skip":
+                            skip_text = True
+                            self._update_snapshot_section(note, "text", text_fields)
+                        elif decision == "abort":
+                            self._emit_plain_error("Processing cancelled by user.")
+                            return
+                    if not skip_text:
+                        for field_name, value in writable_text_values.items():
+                            note[field_name] = value
+                        try:
+                            self._commit_note_sections(
+                                note,
+                                [("text", text_fields)],
+                            )
+                        except ExternalException as exc:
+                            self._emit_stage_error("Saving text fields", exc)
+                            return
                 note_state["text"] = True
             else:
                 note_state["text"] = True
@@ -632,6 +658,10 @@ class NoteProcessor(QThread):
             if not prompt_value:
                 state["audio"][mapping_key] = True
                 continue
+            current_value = note[audio_field]
+            if not self._should_write_field(audio_field, current_value):
+                state["audio"][mapping_key] = True
+                continue
             pending.append((mapping_key, prompt_value))
 
         if not pending:
@@ -723,6 +753,10 @@ class NoteProcessor(QThread):
             if not prompt_value:
                 state["image"][mapping_key] = True
                 continue
+            current_value = note[image_field]
+            if not self._should_write_field(image_field, current_value):
+                state["image"][mapping_key] = True
+                continue
             pending.append((mapping_key, prompt_value))
 
         if not pending:
@@ -788,7 +822,11 @@ class NoteProcessor(QThread):
         source_raw = str(note[self._oaad_source_field])
         term = self._prepare_oaad_term(source_raw)
         current_value = str(note[self._oaad_target_field] or "")
-        if current_value.strip() and not self._oaad_overwrite:
+        if not self._should_write_field(
+            self._oaad_target_field,
+            current_value,
+            legacy_overwrite=self._oaad_overwrite,
+        ):
             return note, []
         base_url = OAAD_HOME_URL
         link = base_url
@@ -867,7 +905,11 @@ class NoteProcessor(QThread):
         if not term:
             return note, []
         current_value = str(note[self._youglish_target_field] or "")
-        if current_value.strip() and not self._youglish_overwrite:
+        if not self._should_write_field(
+            self._youglish_target_field,
+            current_value,
+            legacy_overwrite=self._youglish_overwrite,
+        ):
             return note, []
         link = self._build_youglish_url(term)
         if not link:
@@ -1057,6 +1099,35 @@ class NoteProcessor(QThread):
             return bool(int(value))
         except Exception:
             return bool(value)
+
+    @staticmethod
+    def _parse_protected_fields(raw_value: str) -> set[str]:
+        return {part.strip() for part in str(raw_value or "").split(",") if part.strip()}
+
+    @staticmethod
+    def _is_empty_field_value(value: Any) -> bool:
+        if value is None:
+            return True
+        return not str(value).strip()
+
+    def _should_write_field(
+        self,
+        field_name: str,
+        current_value: Any,
+        *,
+        legacy_overwrite: bool = False,
+    ) -> bool:
+        if field_name in self._protected_fields_this_run:
+            return False
+        if self._overwrite_this_run:
+            return True
+        if field_name in self._protected_fields_config:
+            return False
+        if self._overwrite_by_config:
+            return True
+        if legacy_overwrite:
+            return True
+        return self._is_empty_field_value(current_value)
 
     def _initialize_note_progress(self) -> None:
         for note in self.notes:

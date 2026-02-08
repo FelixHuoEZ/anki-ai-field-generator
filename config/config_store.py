@@ -50,6 +50,8 @@ class LLMConfig:
     schedule_batch_size: int = 5
     schedule_daily_limit: int = 30
     schedule_notice_seconds: int = 30
+    field_overwrite_by_config: bool = False
+    field_protected_fields: str = ""
     auto_queue_silent: bool = True
     auto_queue_display_field: str = ""
     oaad_enabled: bool = True
@@ -104,6 +106,8 @@ class LLMConfig:
             "schedule_batch_size": self.schedule_batch_size,
             "schedule_daily_limit": self.schedule_daily_limit,
             "schedule_notice_seconds": self.schedule_notice_seconds,
+            "field_overwrite_by_config": self.field_overwrite_by_config,
+            "field_protected_fields": self.field_protected_fields,
             "auto_queue_silent": self.auto_queue_silent,
             "auto_queue_display_field": self.auto_queue_display_field,
             "oaad_enabled": self.oaad_enabled,
@@ -160,6 +164,8 @@ class LLMConfig:
             schedule_batch_size=int(data.get("schedule_batch_size", 5) or 5),
             schedule_daily_limit=int(data.get("schedule_daily_limit", 30) or 30),
             schedule_notice_seconds=int(data.get("schedule_notice_seconds", 30) or 30),
+            field_overwrite_by_config=bool(data.get("field_overwrite_by_config", False)),
+            field_protected_fields=str(data.get("field_protected_fields", "") or ""),
             auto_queue_silent=bool(data.get("auto_queue_silent", True)),
             auto_queue_display_field=str(data.get("auto_queue_display_field", "") or ""),
             oaad_enabled=bool(data.get("oaad_enabled", True)),

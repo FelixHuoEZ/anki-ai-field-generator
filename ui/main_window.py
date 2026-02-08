@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, client_factory, on_submit: Callable):
+    def __init__(self, client_factory, on_submit: Callable[..., None]):
         super().__init__()
         self.client_factory = client_factory
         self.on_submit = on_submit
@@ -102,4 +102,19 @@ class MainWindow(QMainWindow):
 
     def _accept(self) -> None:
         if self.current_client_widget and self.current_client_widget.accept():
-            self.on_submit()
+            overwrite_this_run = False
+            protected_fields_this_run = []
+            consume = getattr(self.current_client_widget, "consume_overwrite_this_run", None)
+            if callable(consume):
+                overwrite_this_run = bool(consume())
+            consume_fields = getattr(
+                self.current_client_widget,
+                "consume_protected_fields_this_run",
+                None,
+            )
+            if callable(consume_fields):
+                protected_fields_this_run = list(consume_fields())
+            self.on_submit(
+                overwrite_this_run=overwrite_this_run,
+                protected_fields_this_run=protected_fields_this_run,
+            )

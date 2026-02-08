@@ -22,12 +22,18 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QTextEdit,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 from PyQt6.QtGui import QFont
 
-from .mapping_sections import GenerationSection, RetrySection, ToggleMappingEditor
+from .mapping_sections import (
+    FieldChecklist,
+    GenerationSection,
+    RetrySection,
+    ToggleMappingEditor,
+)
 from ..providers.provider_defaults import apply_provider_defaults, reset_button_enabled
 from ..providers.provider_options import (
     AUDIO_PROVIDERS,
@@ -139,6 +145,68 @@ class UserBaseDialog(QWidget):
 
         self.retry_section = RetrySection()
         container_layout.addWidget(self.retry_section)
+
+        self.field_update_group, field_update_form = self._create_titled_group(
+            "Field update strategy"
+        )
+        field_update_hint = QLabel("Default strategy: Fill Empty Only")
+        field_update_hint.setWordWrap(True)
+        field_update_form.addRow(field_update_hint)
+        self.field_overwrite_by_config_checkbox = QCheckBox(
+            "Overwrite existing values by default (Permanent)"
+        )
+        field_update_form.addRow(self.field_overwrite_by_config_checkbox)
+        self.field_overwrite_this_run_checkbox = QCheckBox(
+            "Overwrite existing values for this run only (This Run)"
+        )
+        field_update_form.addRow(self.field_overwrite_this_run_checkbox)
+        self.field_protected_fields_toggle = QToolButton()
+        self.field_protected_fields_toggle.setText("Protected fields")
+        self.field_protected_fields_toggle.setCheckable(True)
+        self.field_protected_fields_toggle.setChecked(False)
+        self.field_protected_fields_toggle.setToolButtonStyle(
+            Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self.field_protected_fields_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        self.field_protected_fields_toggle.toggled.connect(
+            self._toggle_protected_fields_panel
+        )
+
+        self.field_protected_fields_selector = FieldChecklist(
+            self.card_fields,
+            visible_rows=10,
+        )
+        self.field_protected_fields_this_run_selector = FieldChecklist(
+            self.card_fields,
+            visible_rows=10,
+        )
+
+        self.field_protected_fields_panel = QWidget()
+        protected_panel_layout = QHBoxLayout(self.field_protected_fields_panel)
+        protected_panel_layout.setContentsMargins(0, 0, 0, 0)
+        protected_panel_layout.setSpacing(8)
+
+        this_run_box = QGroupBox("This Run")
+        this_run_layout = QVBoxLayout(this_run_box)
+        this_run_layout.setContentsMargins(8, 8, 8, 8)
+        this_run_layout.addWidget(self.field_protected_fields_this_run_selector)
+        protected_panel_layout.addWidget(this_run_box, 1)
+
+        permanent_box = QGroupBox("Permanent (Advanced: modify with caution)")
+        permanent_layout = QVBoxLayout(permanent_box)
+        permanent_layout.setContentsMargins(8, 8, 8, 8)
+        permanent_layout.addWidget(self.field_protected_fields_selector)
+        protected_panel_layout.addWidget(permanent_box, 1)
+        self.field_protected_fields_panel.setVisible(False)
+
+        protected_container = QWidget()
+        protected_container_layout = QVBoxLayout(protected_container)
+        protected_container_layout.setContentsMargins(0, 0, 0, 0)
+        protected_container_layout.setSpacing(6)
+        protected_container_layout.addWidget(self.field_protected_fields_toggle)
+        protected_container_layout.addWidget(self.field_protected_fields_panel)
+        field_update_form.addRow(protected_container)
+        container_layout.addWidget(self.field_update_group)
 
         # Text generation section -------------------------------------
         self.text_mapping_editor = ToggleMappingEditor(
@@ -345,6 +413,18 @@ class UserBaseDialog(QWidget):
         self.text_section.enable_checkbox.stateChanged.connect(self._on_field_modified)
         self.image_section.enable_checkbox.stateChanged.connect(self._on_field_modified)
         self.audio_section.enable_checkbox.stateChanged.connect(self._on_field_modified)
+        self.field_overwrite_by_config_checkbox.stateChanged.connect(
+            self._on_field_modified
+        )
+        self.field_overwrite_this_run_checkbox.stateChanged.connect(
+            self._on_field_modified
+        )
+        self.field_protected_fields_selector.selectionChanged.connect(
+            self._on_field_modified
+        )
+        self.field_protected_fields_this_run_selector.selectionChanged.connect(
+            self._on_field_modified
+        )
 
         # Mapping editors
         self.text_mapping_editor.rowsChanged.connect(self._on_field_modified)
@@ -396,6 +476,12 @@ class UserBaseDialog(QWidget):
         if self._loading:
             return
         self._mark_dirty()
+
+    def _toggle_protected_fields_panel(self, expanded: bool) -> None:
+        self.field_protected_fields_toggle.setArrowType(
+            Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        )
+        self.field_protected_fields_panel.setVisible(expanded)
 
     def _reset_dirty_state(self) -> None:
         self._initial_state = self._capture_state()
@@ -451,6 +537,14 @@ class UserBaseDialog(QWidget):
             "text_provider_key": self._text_api_keys.get(text_provider[0], ""),
             "image_provider_key": self._image_api_keys.get(image_provider[0], ""),
             "audio_provider_key": self._audio_api_keys.get(audio_provider[0], ""),
+            "field_overwrite_by_config": self.field_overwrite_by_config_checkbox.isChecked(),
+            "field_overwrite_this_run": self.field_overwrite_this_run_checkbox.isChecked(),
+            "field_protected_fields": tuple(
+                self.field_protected_fields_selector.selected_fields()
+            ),
+            "field_protected_fields_this_run": tuple(
+                self.field_protected_fields_this_run_selector.selected_fields()
+            ),
             "auto_generate_on_add": self.auto_generate_checkbox.isChecked(),
             "oaad_enabled": self.oaad_enable_checkbox.isChecked(),
             "oaad_source": self.oaad_source_input.text().strip(),
@@ -706,6 +800,28 @@ class UserBaseDialog(QWidget):
                 or 30
             )
         )
+        self.field_overwrite_by_config_checkbox.setChecked(
+            self._get_bool_setting(
+                SettingsNames.FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME, False
+            )
+        )
+        self.field_overwrite_this_run_checkbox.setChecked(False)
+        configured_protected = self._parse_csv_fields(
+            self.app_settings.value(
+                SettingsNames.FIELD_PROTECTED_FIELDS_SETTING_NAME,
+                defaultValue="",
+                type=str,
+            )
+            or ""
+        )
+        available_permanent = sorted(
+            set(self.card_fields) | set(configured_protected),
+            key=lambda value: value.lower(),
+        )
+        self.field_protected_fields_selector.set_fields(available_permanent)
+        self.field_protected_fields_selector.set_selected_fields(configured_protected)
+        self.field_protected_fields_this_run_selector.set_fields(self.card_fields)
+        self.field_protected_fields_this_run_selector.set_selected_fields([])
 
         self.oaad_enable_checkbox.setChecked(
             self._get_bool_setting(SettingsNames.OAAD_ENABLED_SETTING_NAME, True)
@@ -797,6 +913,21 @@ class UserBaseDialog(QWidget):
             )
         )
         self.note_type_status.show()
+
+    def consume_overwrite_this_run(self) -> bool:
+        enabled = self.field_overwrite_this_run_checkbox.isChecked()
+        blocked = self.field_overwrite_this_run_checkbox.blockSignals(True)
+        self.field_overwrite_this_run_checkbox.setChecked(False)
+        self.field_overwrite_this_run_checkbox.blockSignals(blocked)
+        return enabled
+
+    def consume_protected_fields_this_run(self) -> list[str]:
+        fields = self.field_protected_fields_this_run_selector.selected_fields()
+        was_loading = self._loading
+        self._loading = True
+        self.field_protected_fields_this_run_selector.set_selected_fields([])
+        self._loading = was_loading
+        return fields
 
     # Acceptance -------------------------------------------------------
 
@@ -998,6 +1129,14 @@ class UserBaseDialog(QWidget):
         self.app_settings.setValue(
             SettingsNames.SCHEDULE_NOTICE_SECONDS_SETTING_NAME,
             self.schedule_notice_seconds_input.value(),
+        )
+        self.app_settings.setValue(
+            SettingsNames.FIELD_OVERWRITE_BY_CONFIG_SETTING_NAME,
+            self.field_overwrite_by_config_checkbox.isChecked(),
+        )
+        self.app_settings.setValue(
+            SettingsNames.FIELD_PROTECTED_FIELDS_SETTING_NAME,
+            self._join_csv_fields(self.field_protected_fields_selector.selected_fields()),
         )
         self.app_settings.setValue(
             SettingsNames.OAAD_ENABLED_SETTING_NAME,
@@ -1205,6 +1344,30 @@ class UserBaseDialog(QWidget):
             flag = "1" if enabled else "0"
             encoded.append(f"{left}{IMAGE_MAPPING_SEPARATOR}{right}::{flag}")
         return encoded
+
+    @staticmethod
+    def _parse_csv_fields(raw: str) -> list[str]:
+        fields = [part.strip() for part in str(raw or "").split(",")]
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for field in fields:
+            if not field or field in seen:
+                continue
+            seen.add(field)
+            deduped.append(field)
+        return deduped
+
+    @staticmethod
+    def _join_csv_fields(fields: Iterable[str]) -> str:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for field in fields:
+            value = str(field).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            normalized.append(value)
+        return ",".join(normalized)
 
     def _get_bool_setting(self, name: str, default: bool) -> bool:
         value = self.app_settings.value(name, defaultValue=default)

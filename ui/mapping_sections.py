@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -234,6 +235,136 @@ class ToggleMappingEditor(QWidget):
 
         self._summary_label.setText(summary)
         self.rowsChanged.emit()
+
+
+class FieldChecklist(QWidget):
+    """Field selector with checkbox rows and quick toggle controls."""
+
+    selectionChanged = pyqtSignal()
+
+    def __init__(self, fields: Optional[list[str]] = None, *, visible_rows: int = 10) -> None:
+        super().__init__()
+        self._checkboxes: dict[str, QCheckBox] = {}
+        self._visible_rows = max(1, int(visible_rows))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self._summary_label = QLabel("No fields available.")
+        self._summary_label.setWordWrap(True)
+        layout.addWidget(self._summary_label)
+
+        controls = QHBoxLayout()
+        select_all = QPushButton("Select All")
+        select_all.clicked.connect(lambda: self._set_all(True))
+        controls.addWidget(select_all)
+        select_none = QPushButton("Select None")
+        select_none.clicked.connect(lambda: self._set_all(False))
+        controls.addWidget(select_none)
+        invert = QPushButton("Invert")
+        invert.clicked.connect(self._invert)
+        controls.addWidget(invert)
+        controls.addStretch()
+        layout.addLayout(controls)
+        self._control_buttons = [select_all, select_none, invert]
+
+        self._rows_widget = QWidget()
+        self._rows_layout = QVBoxLayout(self._rows_widget)
+        self._rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._rows_layout.setSpacing(4)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._scroll.setWidget(self._rows_widget)
+        layout.addWidget(self._scroll)
+
+        self.set_fields(fields or [])
+        self._update_scroll_height()
+
+    def set_fields(self, fields: list[str]) -> None:
+        selected = set(self.selected_fields())
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self._checkboxes.clear()
+
+        normalized = sorted(
+            {str(field).strip() for field in fields if str(field).strip()},
+            key=lambda value: value.lower(),
+        )
+        for field in normalized:
+            checkbox = QCheckBox(field)
+            checkbox.setChecked(field in selected)
+            checkbox.stateChanged.connect(self._on_changed)
+            self._rows_layout.addWidget(checkbox)
+            self._checkboxes[field] = checkbox
+
+        self._update_summary()
+        self._update_scroll_height()
+        self.selectionChanged.emit()
+
+    def selected_fields(self) -> list[str]:
+        return [
+            field for field, checkbox in self._checkboxes.items() if checkbox.isChecked()
+        ]
+
+    def set_selected_fields(self, fields: list[str]) -> None:
+        selected = {str(field).strip() for field in fields if str(field).strip()}
+        for field, checkbox in self._checkboxes.items():
+            blocked = checkbox.blockSignals(True)
+            checkbox.setChecked(field in selected)
+            checkbox.blockSignals(blocked)
+        self._update_summary()
+        self.selectionChanged.emit()
+
+    def _set_all(self, value: bool) -> None:
+        for checkbox in self._checkboxes.values():
+            checkbox.setChecked(value)
+        self._update_summary()
+        self.selectionChanged.emit()
+
+    def _invert(self) -> None:
+        for checkbox in self._checkboxes.values():
+            checkbox.setChecked(not checkbox.isChecked())
+        self._update_summary()
+        self.selectionChanged.emit()
+
+    def _on_changed(self) -> None:
+        self._update_summary()
+        self.selectionChanged.emit()
+
+    def _update_summary(self) -> None:
+        total = len(self._checkboxes)
+        if total == 0:
+            self._summary_label.setText("No fields available.")
+            for button in self._control_buttons:
+                button.setEnabled(False)
+            return
+        selected = self.selected_fields()
+        for button in self._control_buttons:
+            button.setEnabled(True)
+        preview = ", ".join(selected[:6]) if selected else "none"
+        suffix = " ..." if len(selected) > 6 else ""
+        self._summary_label.setText(
+            f"Selected {len(selected)}/{total}: {preview}{suffix}"
+        )
+
+    def _update_scroll_height(self) -> None:
+        probe = QCheckBox("x")
+        row_height = max(20, probe.sizeHint().height())
+        spacing = max(0, self._rows_layout.spacing())
+        margins = self._rows_layout.contentsMargins()
+        content_height = (
+            (row_height * self._visible_rows)
+            + (spacing * max(0, self._visible_rows - 1))
+            + margins.top()
+            + margins.bottom()
+        )
+        frame = self._scroll.frameWidth() * 2
+        self._scroll.setFixedHeight(content_height + frame + 2)
 
 
 class RetrySection(QGroupBox):
