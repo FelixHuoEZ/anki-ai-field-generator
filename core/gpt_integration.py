@@ -86,7 +86,10 @@ def _show_progress_dialog(parent) -> None:
         QMessageBox.information(
             parent or mw,
             "Anki AI",
-            f"后台正在处理 {bg_count} 条自动任务：\n{note_text}{extra}\n\n请稍候。",
+            (
+                f"Processing {bg_count} auto tasks in the background:\n"
+                f"{note_text}{extra}\n\nPlease wait."
+            ),
         )
         return
     last_status = settings.value(
@@ -103,7 +106,7 @@ def _show_progress_dialog(parent) -> None:
     QMessageBox.information(
         parent or mw,
         "Anki AI",
-        f"当前没有正在运行的批处理任务。\n\n{last_status}{suffix}",
+        f"No batch tasks are currently running.\n\n{last_status}{suffix}",
     )
 
 
@@ -181,10 +184,10 @@ def _open_youglish_for_selection(browser) -> None:
             browser,
             "Open YouGlish",
             (
-                f"已选择 {len(note_ids)} 条笔记。\n"
-                "是：为全部笔记打开并写入链接。\n"
-                "否：仅处理第一条笔记。\n"
-                "取消：不执行。"
+                f"{len(note_ids)} notes selected.\n"
+                "Yes: Open and write links for all selected notes.\n"
+                "No: Process only the first note.\n"
+                "Cancel: Do nothing."
             ),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No
@@ -281,7 +284,7 @@ def _create_ai_menu_actions(browser) -> _AiMenuActions:
     manage_action = QAction("Manage AI Configurations", browser)
     manage_action.triggered.connect(lambda: show_config_dialog(browser))
 
-    progress_action = QAction("显示运行中的任务", browser)
+    progress_action = QAction("Show Running Tasks", browser)
     progress_action.triggered.connect(lambda: _show_progress_dialog(browser))
 
     yg_open = QAction("Open YouGlish Link", browser)
@@ -316,10 +319,10 @@ def _open_oaad_for_selection(browser) -> None:
             browser,
             "Open OAAD",
             (
-                f"已选择 {len(note_ids)} 条笔记。\n"
-                "是：为全部笔记打开并写入链接。\n"
-                "否：仅处理第一条笔记。\n"
-                "取消：不执行。"
+                f"{len(note_ids)} notes selected.\n"
+                "Yes: Open and write links for all selected notes.\n"
+                "No: Process only the first note.\n"
+                "Cancel: Do nothing."
             ),
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No
@@ -404,7 +407,7 @@ def _confirm_youglish_settings(browser) -> bool:
         QMessageBox.information(
             browser,
             "Anki AI",
-            "YouGlish 生成在当前配置中被关闭，请先在配置中启用。",
+            "YouGlish generation is disabled in the current configuration. Enable it first.",
         )
         return False
     source = (
@@ -427,7 +430,7 @@ def _confirm_youglish_settings(browser) -> bool:
         QMessageBox.warning(
             browser,
             "Anki AI",
-            "YouGlish 源/目标字段未配置，请先在配置中设置。",
+            "YouGlish source/target fields are not configured. Configure them first.",
         )
         return False
     accent = (
@@ -446,16 +449,16 @@ def _confirm_youglish_settings(browser) -> bool:
         overwrite = overwrite.strip().lower() in {"1", "true", "yes", "on"}
     config_name = _current_config_name()
     summary = (
-        f"配置: {config_name}\n"
-        f"源字段: {source}\n"
-        f"目标字段: {target}\n"
-        f"方言: {accent.upper()}\n"
-        f"覆盖已有值: {'是' if overwrite else '否'}\n\n"
-        "是否使用以上设置批量更新选中笔记的 YouGlish 链接？"
+        f"Configuration: {config_name}\n"
+        f"Source field: {source}\n"
+        f"Target field: {target}\n"
+        f"Accent: {accent.upper()}\n"
+        f"Overwrite existing value: {'Yes' if overwrite else 'No'}\n\n"
+        "Use these settings to batch-update YouGlish links for selected notes?"
     )
     response = QMessageBox.question(
         browser,
-        "确认 YouGlish 配置",
+        "Confirm YouGlish Settings",
         summary,
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
     )
@@ -474,7 +477,7 @@ def _confirm_oaad_settings(browser) -> bool:
         QMessageBox.information(
             browser,
             "Anki AI",
-            "OAAD 生成在当前配置中被关闭，请先在配置中启用。",
+            "OAAD generation is disabled in the current configuration. Enable it first.",
         )
         return False
     source = (
@@ -509,15 +512,15 @@ def _confirm_oaad_settings(browser) -> bool:
         overwrite = overwrite.lower() in {"1", "true", "yes", "on"}
     overwrite = bool(overwrite)
     summary = (
-        f"源字段: {source}\n"
-        f"目标字段: {target}\n"
-        f"方言: {accent.upper()}\n"
-        f"覆盖已有值: {'是' if overwrite else '否'}\n\n"
-        "是否使用以上设置批量更新选中笔记的 OAAD 链接？"
+        f"Source field: {source}\n"
+        f"Target field: {target}\n"
+        f"Accent: {accent.upper()}\n"
+        f"Overwrite existing value: {'Yes' if overwrite else 'No'}\n\n"
+        "Use these settings to batch-update OAAD links for selected notes?"
     )
     response = QMessageBox.question(
         browser,
-        "确认 OAAD 配置",
+        "Confirm OAAD Settings",
         summary,
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
     )

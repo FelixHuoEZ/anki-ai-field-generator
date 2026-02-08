@@ -92,8 +92,9 @@ class SchedulerManager:
         if mw is not None:
             mw.progress.start(
                 label=(
-                    f"{cfg.notice_seconds} 秒后将自动处理笔记（每批最多 {cfg.batch_size} 条，"
-                    f"每日上限 {cfg.daily_limit}）。点击取消以跳过本次。"
+                    f"Auto-processing notes in {cfg.notice_seconds}s "
+                    f"(up to {cfg.batch_size} per batch, daily limit {cfg.daily_limit}). "
+                    "Click Cancel to skip this run."
                 ),
                 parent=mw,
                 immediate=True,

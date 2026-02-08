@@ -346,8 +346,9 @@ class NoteProcessor(QThread):
                 and not self._had_error
             ):
                 message = (
-                    f"任务未能完成全部笔记（已完成 {self.current_index}/{self.total_items}）。\n"
-                    f"请查看日志获取详情：{LOG_FILE}"
+                    "Task did not finish all notes "
+                    f"(completed {self.current_index}/{self.total_items}).\n"
+                    f"See log for details: {LOG_FILE}"
                 )
                 self._emit_plain_error(message)
                 return
@@ -356,8 +357,8 @@ class NoteProcessor(QThread):
         except Exception as exc:  # pragma: no cover
             self._log_event("NoteProcessor crashed with unexpected error.", exc=exc)
             message = (
-                f"任务异常退出：{exc}\n"
-                f"请查看日志获取更多信息：{LOG_FILE}"
+                f"Task exited unexpectedly: {exc}\n"
+                f"See log for more details: {LOG_FILE}"
             )
             self.error.emit(message)
         finally:
@@ -420,7 +421,7 @@ class NoteProcessor(QThread):
                             )
                             continue
                         if self._should_skip_note_error("text", exc):
-                            self._record_note_error(note, "文本生成", exc)
+                            self._record_note_error(note, "Text generation", exc)
                             self.current_index += 1
                             skip_note = True
                             break
@@ -449,9 +450,9 @@ class NoteProcessor(QThread):
                     )
                     self._record_note_error(
                         note,
-                        "文本生成",
+                        "Text generation",
                         ExternalException(
-                            f"模型响应缺少字段：{', '.join(missing_keys)}",
+                            f"Model response missing fields: {', '.join(missing_keys)}",
                             code=ErrorCode.BAD_REQUEST,
                             details={
                                 "missing_keys": missing_keys,
@@ -594,7 +595,7 @@ class NoteProcessor(QThread):
                             [("oaad", oaad_fields)],
                         )
                 except ExternalException as exc:
-                    self._emit_stage_error("OAAD 链接生成", exc)
+                    self._emit_stage_error("OAAD link generation", exc)
                     return
             else:
                 note_state["oaad"] = True
@@ -614,7 +615,7 @@ class NoteProcessor(QThread):
                             [("youglish", youglish_fields)],
                         )
                 except ExternalException as exc:
-                    self._emit_stage_error("YouGlish 链接生成", exc)
+                    self._emit_stage_error("YouGlish link generation", exc)
                     return
             else:
                 note_state["youglish"] = True
@@ -672,7 +673,7 @@ class NoteProcessor(QThread):
             note,
             "audio",
             pending_targets,
-            {field: "[将写入新音频标签]" for field in pending_targets},
+            {field: "[Will write new audio tag]" for field in pending_targets},
         )
         if conflicts:
             decision = self._wait_for_conflict_resolution(note.id, "audio", conflicts)
@@ -767,7 +768,7 @@ class NoteProcessor(QThread):
             note,
             "image",
             pending_targets,
-            {field: "[将写入新图像]" for field in pending_targets},
+            {field: "[Will write new image]" for field in pending_targets},
         )
         if conflicts:
             decision = self._wait_for_conflict_resolution(note.id, "image", conflicts)
@@ -871,7 +872,7 @@ class NoteProcessor(QThread):
                 return note, []
             if decision == "abort":
                 raise ExternalException(
-                    "OAAD 链接写入已取消。",
+                    "OAAD link write cancelled.",
                     code=ErrorCode.GENERIC,
                 )
         progress_hint = int(min(99, base_progress + (per_card * 0.82)))
@@ -935,7 +936,7 @@ class NoteProcessor(QThread):
                 return note, []
             if decision == "abort":
                 raise ExternalException(
-                    "YouGlish 链接写入已取消。",
+                    "YouGlish link write cancelled.",
                     code=ErrorCode.GENERIC,
                 )
         progress_hint = int(min(99, base_progress + (per_card * 0.9)))
@@ -1479,7 +1480,7 @@ class NoteProcessor(QThread):
             return
         self._with_collection_retry(
             lambda: collection.update_note(note),
-            "写入笔记",
+            "Writing note",
             progress_value=self._current_progress_value(),
         )
         for section, fields in sections_list:
@@ -1500,7 +1501,7 @@ class NoteProcessor(QThread):
 
         refreshed = self._with_collection_retry(
             _fetch_note,
-            "同步笔记",
+            "Refreshing note",
             progress_value=progress_value,
         )
         return refreshed or note
@@ -1534,7 +1535,10 @@ class NoteProcessor(QThread):
                 )
                 if attempt >= self._collection_retry_limit:
                     raise ExternalException(
-                        "Anki 正在执行其它操作（例如添加或同步）。待其完成后再重试。",
+                        (
+                            "Anki is busy with another operation "
+                            "(for example adding or syncing). Retry after it completes."
+                        ),
                         code=ErrorCode.CONNECTION,
                     ) from exc
                 wait_seconds = self._collection_retry_delay
@@ -1545,7 +1549,7 @@ class NoteProcessor(QThread):
                 )
                 self.progress_updated.emit(
                     progress,
-                    f"{stage_label} 暂停，正在等待 Anki 完成其它操作…",
+                    f"{stage_label} paused, waiting for Anki to finish another operation...",
                 )
                 QThread.msleep(int(wait_seconds * 1000))
         # unreachable
@@ -1600,7 +1604,7 @@ class NoteProcessor(QThread):
     ) -> None:
         note_id = getattr(note, "id", "unknown")
         message = (
-            f"笔记 {note_id} 在 {stage_label} 阶段失败，已跳过：{exc}"
+            f"Note {note_id} failed at {stage_label}; skipped: {exc}"
         )
         self._note_errors.append(message)
         self._log_event(message, exc=exc)
@@ -1614,8 +1618,8 @@ class NoteProcessor(QThread):
             self.note_error_summary = ""
             return
         summary = (
-            f"处理完成，但有 {len(self._note_errors)} 张笔记失败并被跳过。"
-            f"详情请查看 {LOG_FILE.name}。"
+            f"Processing finished, but {len(self._note_errors)} notes failed and were skipped. "
+            f"See {LOG_FILE.name} for details."
         )
         self.note_error_summary = summary
         self._log_event(summary)
@@ -1642,7 +1646,7 @@ class NoteProcessor(QThread):
     ) -> None:
         note_id = getattr(note, "id", "unknown")
         message = (
-            f"笔记 {note_id} 文本生成返回非法 JSON，正在重试 "
+            f"Note {note_id} returned invalid JSON during text generation; retrying "
             f"{attempt}/{total_attempts - 1} ..."
         )
         self._log_event(message, exc=exc)

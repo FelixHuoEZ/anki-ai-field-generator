@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QSpinBox,
+    QSplitter,
 )
 
 try:
@@ -171,10 +172,16 @@ class ConfigManagerDialog(QDialog):
     # UI -----------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        main_layout = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(splitter, 1)
 
         # Left column: list of saved configurations
+        left_widget = QWidget()
         list_column = QVBoxLayout()
+        list_column.setContentsMargins(0, 0, 0, 0)
         self.config_list = QListWidget()
         self.config_list.currentItemChanged.connect(self._on_selection_changed)
         list_column.addWidget(self.config_list)
@@ -191,10 +198,13 @@ class ConfigManagerDialog(QDialog):
         list_buttons.addWidget(self.delete_button)
         list_buttons.addStretch()
         list_column.addLayout(list_buttons)
-
-        main_layout.addLayout(list_column, 1)
+        left_widget.setLayout(list_column)
+        splitter.addWidget(left_widget)
 
         # Right column: scrollable editor + fixed footer
+        right_widget = QWidget()
+        right_column = QVBoxLayout(right_widget)
+        right_column.setContentsMargins(0, 0, 0, 0)
         editor_container = QWidget()
         editor_layout = QVBoxLayout(editor_container)
         editor_layout.setContentsMargins(12, 8, 12, 8)
@@ -527,7 +537,6 @@ class ConfigManagerDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(editor_container)
 
-        right_column = QVBoxLayout()
         right_column.addWidget(scroll_area, 1)
 
         footer_widget = QWidget()
@@ -546,8 +555,10 @@ class ConfigManagerDialog(QDialog):
         self.close_button.clicked.connect(self.accept)
         footer.addWidget(self.close_button)
         right_column.addWidget(footer_widget, 0)
-
-        main_layout.addLayout(right_column, 2)
+        splitter.addWidget(right_widget)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        splitter.setSizes([300, 700])
 
     def _install_dirty_watchers(self) -> None:
         self.name_input.textChanged.connect(self._on_form_modified)
@@ -794,8 +805,11 @@ class ConfigManagerDialog(QDialog):
             return True
         response = QMessageBox.question(
             self,
-            "放弃未保存的修改",
-            f"当前配置存在未保存的变更。确定要{context}并放弃这些修改吗？",
+            "Discard unsaved changes",
+            (
+                "Current configuration contains unsaved changes. "
+                f"Are you sure you want to {context} and discard them?"
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         return response == QMessageBox.StandardButton.Yes
@@ -816,7 +830,7 @@ class ConfigManagerDialog(QDialog):
             self._reset_dirty_state()
             return
         if previous is not None and self._has_unsaved_changes():
-            if not self._confirm_discard_changes("切换配置"):
+            if not self._confirm_discard_changes("switch configuration"):
                 self.config_list.blockSignals(True)
                 self.config_list.setCurrentItem(previous)
                 self.config_list.blockSignals(False)
@@ -1203,7 +1217,7 @@ class ConfigManagerDialog(QDialog):
         if provider == self._current_text_provider:
             self._update_text_reset_button()
             return
-        if self._dirty and not self._confirm_discard_changes("切换文本提供者"):
+        if self._dirty and not self._confirm_discard_changes("switch text provider"):
             self._loading = True
             revert_index = combo.findData(self._current_text_provider)
             if revert_index != -1:
@@ -1231,7 +1245,7 @@ class ConfigManagerDialog(QDialog):
         if provider == self._current_image_provider:
             self._update_image_reset_button()
             return
-        if self._dirty and not self._confirm_discard_changes("切换图像提供者"):
+        if self._dirty and not self._confirm_discard_changes("switch image provider"):
             self._loading = True
             revert_index = combo.findData(self._current_image_provider)
             if revert_index != -1:
@@ -1259,7 +1273,7 @@ class ConfigManagerDialog(QDialog):
         if provider == self._current_audio_provider:
             self._update_audio_reset_button()
             return
-        if self._dirty and not self._confirm_discard_changes("切换语音提供者"):
+        if self._dirty and not self._confirm_discard_changes("switch speech provider"):
             self._loading = True
             revert_index = combo.findData(self._current_audio_provider)
             if revert_index != -1:
@@ -1374,7 +1388,9 @@ class ConfigManagerDialog(QDialog):
     # Actions ----------------------------------------------------------
 
     def _on_new(self) -> None:
-        if self._has_unsaved_changes() and not self._confirm_discard_changes("创建新配置"):
+        if self._has_unsaved_changes() and not self._confirm_discard_changes(
+            "create a new configuration"
+        ):
             return
         unique_name = self.store.ensure_unique_name("Config")
         new_config = LLMConfig(name=unique_name)
@@ -1385,7 +1401,9 @@ class ConfigManagerDialog(QDialog):
     def _on_delete(self) -> None:
         if not self._current_name:
             return
-        if self._has_unsaved_changes() and not self._confirm_discard_changes("删除配置"):
+        if self._has_unsaved_changes() and not self._confirm_discard_changes(
+            "delete configuration"
+        ):
             return
         confirm = QMessageBox.question(
             self,
@@ -1459,7 +1477,7 @@ class ConfigManagerDialog(QDialog):
         QMessageBox.information(
             self,
             "Current configuration updated",
-            f"现在使用的配置已切换为：{self._current_name}",
+            f"The active configuration is now: {self._current_name}",
         )
 
     def _open_config_file(self) -> None:
@@ -1561,7 +1579,9 @@ class ConfigManagerDialog(QDialog):
         settings.setValue(SettingsNames.AUTO_GENERATE_ON_ADD_SETTING_NAME, config.auto_generate_on_add)
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
-        if self._has_unsaved_changes() and not self._confirm_discard_changes("关闭配置管理窗口"):
+        if self._has_unsaved_changes() and not self._confirm_discard_changes(
+            "close the configuration manager"
+        ):
             event.ignore()
             return
         super().closeEvent(event)

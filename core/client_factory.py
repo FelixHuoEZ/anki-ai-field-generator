@@ -173,6 +173,46 @@ class ClientFactory:
         )
         self.window.show()
 
+    def maybe_sync_runtime_changes_to_active_config(
+        self,
+        runtime_widget,
+        parent=None,
+    ) -> None:
+        if self.active_config is None:
+            return
+        exporter = getattr(runtime_widget, "export_runtime_config", None)
+        if not callable(exporter):
+            return
+        response = QMessageBox.question(
+            parent or self.window,
+            "Sync configuration changes",
+            (
+                f'You changed settings while using "{self.active_config.name}".\n\n'
+                "Save these persistent changes to the current configuration file?\n"
+                "This Run options will not be saved."
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if response != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            updated_config = exporter(self.active_config)
+            self.store.upsert(updated_config)
+            self.active_config = updated_config
+            self._apply_config_to_settings(updated_config)
+        except Exception as exc:
+            QMessageBox.warning(
+                parent or self.window,
+                "Failed to save configuration",
+                f"Could not write changes to config.json.\n\n{exc}",
+            )
+            return
+        QMessageBox.information(
+            parent or self.window,
+            "Configuration updated",
+            f'Configuration "{self.active_config.name}" was updated in config.json.',
+        )
+
     # Submission -------------------------------------------------------
 
     def on_submit(
@@ -494,12 +534,14 @@ class ClientFactory:
         if parent is None:
             return
         dialog = QMessageBox(parent)
-        dialog.setWindowTitle("Anki AI 后台任务出错")
+        dialog.setWindowTitle("Anki AI Background Task Error")
         dialog.setIcon(QMessageBox.Icon.Warning)
-        dialog.setText(f"后台自动处理失败：\n{text}\n\n30 秒后自动跳过。")
-        skip_button = dialog.addButton("跳过", QMessageBox.ButtonRole.AcceptRole)
-        retry_button = dialog.addButton("重试", QMessageBox.ButtonRole.ActionRole)
-        dialog.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        dialog.setText(
+            f"Background auto-processing failed:\n{text}\n\nAuto-skipping in 30 seconds."
+        )
+        skip_button = dialog.addButton("Skip", QMessageBox.ButtonRole.AcceptRole)
+        retry_button = dialog.addButton("Retry", QMessageBox.ButtonRole.ActionRole)
+        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
 
         timer = QTimer(dialog)
         timer.setInterval(1000)
@@ -510,7 +552,10 @@ class ClientFactory:
             if countdown <= 0:
                 dialog.done(QMessageBox.ButtonRole.AcceptRole)
             else:
-                dialog.setText(f"后台自动处理失败：\n{text}\n\n{countdown} 秒后自动跳过。")
+                dialog.setText(
+                    "Background auto-processing failed:\n"
+                    f"{text}\n\nAuto-skipping in {countdown} seconds."
+                )
 
         timer.timeout.connect(update_countdown)
         timer.start()

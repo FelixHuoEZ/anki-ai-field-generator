@@ -43,6 +43,7 @@ from ..providers.provider_options import (
     TEXT_PROVIDERS,
     TEXT_PROVIDER_DEFAULTS,
 )
+from ..config.config_store import LLMConfig
 from ..config.settings import SettingsNames
 
 IMAGE_MAPPING_SEPARATOR = "->"
@@ -50,6 +51,11 @@ IMAGE_MAPPING_SEPARATOR = "->"
 
 class UserBaseDialog(QWidget):
     """Runtime editor that mirrors the configuration manager sections."""
+
+    _THIS_RUN_ONLY_STATE_KEYS = {
+        "field_overwrite_this_run",
+        "field_protected_fields_this_run",
+    }
 
     def __init__(self, app_settings: QSettings, selected_notes: list[AnkiNote], active_config=None):
         super().__init__()
@@ -574,8 +580,11 @@ class UserBaseDialog(QWidget):
             return True
         response = QMessageBox.question(
             self,
-            "放弃未保存的修改",
-            f"当前设置存在未保存的变更。确定要{context}并放弃这些修改吗？",
+            "Discard unsaved changes",
+            (
+                "Current settings contain unsaved changes. "
+                f"Are you sure you want to {context} and discard them?"
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         return response == QMessageBox.StandardButton.Yes
@@ -609,7 +618,7 @@ class UserBaseDialog(QWidget):
         if previous_index == index:
             update_button()
             return
-        if self._dirty and not self._confirm_discard_changes("切换提供者"):
+        if self._dirty and not self._confirm_discard_changes("switch provider"):
             self._loading = True
             combo.setCurrentIndex(previous_index)
             self._loading = False
@@ -913,6 +922,102 @@ class UserBaseDialog(QWidget):
             )
         )
         self.note_type_status.show()
+
+    def has_persistent_changes(self) -> bool:
+        return self._persistent_state(self._capture_state()) != self._persistent_state(
+            self._initial_state
+        )
+
+    def export_runtime_config(self, base_config: LLMConfig) -> LLMConfig:
+        text_rows = self.text_mapping_editor.get_entries()
+        text_entries: list[dict[str, object]] = []
+        response_keys: list[str] = []
+        destination_fields: list[str] = []
+        for key, field, enabled in text_rows:
+            if key or field:
+                text_entries.append({"key": key, "field": field, "enabled": enabled})
+            if enabled and key and field:
+                response_keys.append(key)
+                destination_fields.append(field)
+
+        image_rows = self.image_mapping_editor.get_entries()
+        audio_rows = self.audio_mapping_editor.get_entries()
+
+        text_provider, text_custom = self.text_section.provider()
+        image_provider, image_custom = self.image_section.provider()
+        audio_provider, audio_custom = self.audio_section.provider()
+
+        current_text_key = self.api_key_input.text().strip()
+        text_provider_keys = dict(self._text_api_keys)
+        text_provider_keys[text_provider] = current_text_key
+
+        current_image_key = self.image_api_key_input.text().strip()
+        image_provider_keys = dict(self._image_api_keys)
+        image_provider_keys[image_provider] = current_image_key
+
+        current_audio_key = self.audio_api_key_input.text().strip()
+        audio_provider_keys = dict(self._audio_api_keys)
+        audio_provider_keys[audio_provider] = current_audio_key
+
+        retry_limit, retry_delay = self.retry_section.values()
+
+        return LLMConfig(
+            name=base_config.name or "Default",
+            note_type_ids=list(base_config.note_type_ids or []),
+            text_provider=text_provider,
+            endpoint=self.endpoint_input.text().strip(),
+            api_key=current_text_key,
+            model=self.model_input.text().strip(),
+            text_custom_value=text_custom or "",
+            text_provider_api_keys=text_provider_keys,
+            system_prompt=self.system_prompt_input.toPlainText().strip(),
+            user_prompt=self.user_prompt_input.toPlainText().strip(),
+            response_keys=response_keys,
+            destination_fields=destination_fields,
+            image_prompt_mappings=self._encode_mapping_entries(image_rows),
+            image_provider=image_provider,
+            image_api_key=current_image_key,
+            image_provider_api_keys=image_provider_keys,
+            image_endpoint=self.image_endpoint_input.text().strip(),
+            image_model=self.image_model_input.text().strip() or image_custom or "",
+            audio_prompt_mappings=self._encode_mapping_entries(audio_rows),
+            audio_provider=audio_provider,
+            audio_api_key=current_audio_key,
+            audio_provider_api_keys=audio_provider_keys,
+            audio_endpoint=self.audio_endpoint_input.text().strip(),
+            audio_model=self.audio_model_input.text().strip() or audio_custom or "",
+            audio_voice=self.audio_voice_input.text().strip(),
+            audio_format=self.audio_format_input.text().strip() or "wav",
+            text_mapping_entries=text_entries,
+            enable_text_generation=self.text_section.is_enabled(),
+            enable_image_generation=self.image_section.is_enabled(),
+            enable_audio_generation=self.audio_section.is_enabled(),
+            retry_limit=retry_limit,
+            retry_delay=retry_delay,
+            auto_generate_on_add=self.auto_generate_checkbox.isChecked(),
+            schedule_enabled=self.schedule_enable_checkbox.isChecked(),
+            schedule_query=self.schedule_query_input.text().strip(),
+            schedule_interval_minutes=self.schedule_interval_input.value(),
+            schedule_batch_size=self.schedule_batch_size_input.value(),
+            schedule_daily_limit=self.schedule_daily_limit_input.value(),
+            schedule_notice_seconds=self.schedule_notice_seconds_input.value(),
+            field_overwrite_by_config=self.field_overwrite_by_config_checkbox.isChecked(),
+            field_protected_fields=self._join_csv_fields(
+                self.field_protected_fields_selector.selected_fields()
+            ),
+            auto_queue_silent=self.auto_queue_silent_checkbox.isChecked(),
+            auto_queue_display_field=self.auto_queue_display_field_input.text().strip(),
+            oaad_enabled=self.oaad_enable_checkbox.isChecked(),
+            oaad_source_field=self.oaad_source_input.text().strip() or "_word",
+            oaad_target_field=self.oaad_target_input.text().strip() or "_oaad",
+            oaad_accent=str(self.oaad_accent_combo.currentData() or "us"),
+            oaad_overwrite=self.oaad_overwrite_checkbox.isChecked(),
+            youglish_enabled=self.youglish_enable_checkbox.isChecked(),
+            youglish_source_field=self.youglish_source_input.text().strip() or "_word",
+            youglish_target_field=self.youglish_target_input.text().strip() or "_youglish",
+            youglish_accent=str(self.youglish_accent_combo.currentData() or "us"),
+            youglish_overwrite=self.youglish_overwrite_checkbox.isChecked(),
+        )
 
     def consume_overwrite_this_run(self) -> bool:
         enabled = self.field_overwrite_this_run_checkbox.isChecked()
@@ -1368,6 +1473,14 @@ class UserBaseDialog(QWidget):
             seen.add(value)
             normalized.append(value)
         return ",".join(normalized)
+
+    @classmethod
+    def _persistent_state(cls, state: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            key: value
+            for key, value in state.items()
+            if key not in cls._THIS_RUN_ONLY_STATE_KEYS
+        }
 
     def _get_bool_setting(self, name: str, default: bool) -> bool:
         value = self.app_settings.value(name, defaultValue=default)

@@ -39,7 +39,7 @@ class ProgressDialog(QDialog):
 
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.cancel)
-        self.background_button = QPushButton("后台运行")
+        self.background_button = QPushButton("Run in Background")
         self.background_button.clicked.connect(self._on_background)
         self.resume_button = QPushButton("Continue")
         self.resume_button.clicked.connect(self.resume)
@@ -231,7 +231,8 @@ class ConflictDialog(QDialog):
         note_id = payload.get("note_id")
         section = payload.get("section", "")
         header = QLabel(
-            f"笔记 {note_id} 在 {section} 阶段检测到字段冲突。请选择如何处理。"
+            f"Field conflicts detected for note {note_id} during {section}. "
+            "Choose how to proceed."
         )
         header.setWordWrap(True)
         layout.addWidget(header)
@@ -245,10 +246,10 @@ class ConflictDialog(QDialog):
             current = values.get("current", "")
             generated = values.get("generated", "")
             snippet = (
-                f"字段: {field_name}\n"
-                f"初始值: {original}\n"
-                f"当前值: {current}\n"
-                f"新生成: {generated}"
+                f"Field: {field_name}\n"
+                f"Original: {original}\n"
+                f"Current: {current}\n"
+                f"Generated: {generated}"
             )
             lines.append(snippet)
         details.setPlainText("\n\n".join(lines))
@@ -256,13 +257,13 @@ class ConflictDialog(QDialog):
 
         buttons = QDialogButtonBox()
         overwrite_button = buttons.addButton(
-            "覆盖当前内容", QDialogButtonBox.ButtonRole.AcceptRole
+            "Overwrite Current Value", QDialogButtonBox.ButtonRole.AcceptRole
         )
         skip_button = buttons.addButton(
-            "跳过此笔记", QDialogButtonBox.ButtonRole.DestructiveRole
+            "Skip This Note", QDialogButtonBox.ButtonRole.DestructiveRole
         )
         cancel_button = buttons.addButton(
-            "取消任务", QDialogButtonBox.ButtonRole.RejectRole
+            "Abort Task", QDialogButtonBox.ButtonRole.RejectRole
         )
         buttons.accepted.connect(self._accept_overwrite)
         skip_button.clicked.connect(self._choose_skip)

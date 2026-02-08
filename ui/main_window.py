@@ -101,7 +101,19 @@ class MainWindow(QMainWindow):
     # Acceptance --------------------------------------------------------
 
     def _accept(self) -> None:
-        if self.current_client_widget and self.current_client_widget.accept():
+        if self.current_client_widget is None:
+            return
+
+        has_persistent_changes = False
+        check_persistent = getattr(
+            self.current_client_widget,
+            "has_persistent_changes",
+            None,
+        )
+        if callable(check_persistent):
+            has_persistent_changes = bool(check_persistent())
+
+        if self.current_client_widget.accept():
             overwrite_this_run = False
             protected_fields_this_run = []
             consume = getattr(self.current_client_widget, "consume_overwrite_this_run", None)
@@ -114,6 +126,14 @@ class MainWindow(QMainWindow):
             )
             if callable(consume_fields):
                 protected_fields_this_run = list(consume_fields())
+            if has_persistent_changes:
+                sync_changes = getattr(
+                    self.client_factory,
+                    "maybe_sync_runtime_changes_to_active_config",
+                    None,
+                )
+                if callable(sync_changes):
+                    sync_changes(self.current_client_widget, self)
             self.on_submit(
                 overwrite_this_run=overwrite_this_run,
                 protected_fields_this_run=protected_fields_this_run,
