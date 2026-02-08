@@ -5,6 +5,9 @@ setup_keys.sh
 AGENTS.md
 LOG.md
 config.yaml
+docs/requirements.md
+docs/roadmap.md
+docs/thinking-log.md
 tests/
 tmp/
 
