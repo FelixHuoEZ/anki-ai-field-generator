@@ -5,7 +5,7 @@
 AnkiSpark is an Anki add-on for enriching notes with AI-generated
 text, images, speech, and dictionary/video links.
 
-AnkiWeb add-on page: https://ankiweb.net/shared/info/643253121
+AnkiWeb add-on page: https://ankiweb.net/shared/info/739443485
 
 ## Why this fork
 
@@ -45,7 +45,7 @@ Main additions in this fork:
 
 1. Open Anki.
 2. Go to `Tools -> Add-ons -> Get Add-ons...`.
-3. Enter add-on code: `643253121`.
+3. Enter add-on code: `739443485`.
 4. Restart Anki.
 
 ## Quick start

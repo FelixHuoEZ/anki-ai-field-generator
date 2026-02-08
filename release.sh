@@ -15,9 +15,16 @@ if ! command -v zip >/dev/null 2>&1; then
 fi
 
 ADDON_NAME="${ADDON_NAME:-AnkiSpark}"
+ADDON_PACKAGE="${ADDON_PACKAGE:-ankispark}"
+ADDON_CONFLICTS="${ADDON_CONFLICTS:-}"
 VERSION="${1:-$(git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d%H%M%S)}"
 DIST_DIR="$ROOT_DIR/dist"
 OUTPUT_FILE="$DIST_DIR/${ADDON_NAME}-${VERSION}.ankiaddon"
+
+if [[ ! "$ADDON_PACKAGE" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Error: ADDON_PACKAGE must match ^[A-Za-z0-9._-]+$"
+  exit 1
+fi
 
 INCLUDE_PATHS=(
   "__init__.py"
@@ -44,6 +51,51 @@ if [[ ${#PACKAGE_FILES[@]} -eq 0 ]]; then
   echo "Error: no files selected for packaging."
   exit 1
 fi
+
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ankispark-release.XXXXXX")"
+cleanup() {
+  rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/ }"
+  printf '%s' "$value"
+}
+
+MANIFEST_FILE="$TMP_DIR/manifest.json"
+conflicts_json=""
+if [[ -n "$ADDON_CONFLICTS" ]]; then
+  IFS=',' read -r -a conflicts_arr <<< "$ADDON_CONFLICTS"
+  for conflict in "${conflicts_arr[@]}"; do
+    conflict="${conflict#"${conflict%%[![:space:]]*}"}"
+    conflict="${conflict%"${conflict##*[![:space:]]}"}"
+    if [[ -z "$conflict" ]]; then
+      continue
+    fi
+    escaped_conflict="$(json_escape "$conflict")"
+    if [[ -n "$conflicts_json" ]]; then
+      conflicts_json+=", "
+    fi
+    conflicts_json+="\"$escaped_conflict\""
+  done
+fi
+
+{
+  printf '{\n'
+  printf '  "package": "%s",\n' "$(json_escape "$ADDON_PACKAGE")"
+  printf '  "name": "%s",\n' "$(json_escape "$ADDON_NAME")"
+  printf '  "mod": %s' "$(date +%s)"
+  if [[ -n "$conflicts_json" ]]; then
+    printf ',\n  "conflicts": [%s]\n' "$conflicts_json"
+  else
+    printf '\n'
+  fi
+  printf '}\n'
+} > "$MANIFEST_FILE"
 
 echo "Running sensitive file checks..."
 
@@ -87,6 +139,8 @@ echo "Sensitive checks passed."
 mkdir -p "$DIST_DIR"
 rm -f "$OUTPUT_FILE"
 zip -q "$OUTPUT_FILE" "${PACKAGE_FILES[@]}"
+zip -q -j "$OUTPUT_FILE" "$MANIFEST_FILE"
 
 echo "Package created: $OUTPUT_FILE"
-echo "Included files: ${#PACKAGE_FILES[@]}"
+echo "Included files: $((${#PACKAGE_FILES[@]} + 1))"
+echo "Manifest package: $ADDON_PACKAGE"
