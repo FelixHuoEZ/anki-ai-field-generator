@@ -12,9 +12,9 @@ else:
         AnkiNote = Any  # type: ignore
 
 try:
-    from .prompt_config import PromptConfig
+    from ..config.prompt_config import PromptConfig
 except ImportError:  # pragma: no cover
-    from prompt_config import PromptConfig
+    from config.prompt_config import PromptConfig
 
 
 class LLMClient(ABC):

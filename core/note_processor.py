@@ -24,12 +24,12 @@ try:
 except Exception:  # pragma: no cover
     BackendError = DBError = Exception
 
-from .exceptions import ErrorCode, ExternalException
-from .llm_client import LLMClient
-from .speech_client import SpeechClient
-from .prompt_config import PromptConfig
-from .settings import SettingsNames
-from .gemini_client import GeminiClient
+from ..utils.exceptions import ErrorCode, ExternalException
+from ..providers.llm_client import LLMClient
+from ..providers.speech_client import SpeechClient
+from ..config.prompt_config import PromptConfig
+from ..config.settings import SettingsNames
+from ..providers.gemini_client import GeminiClient
 
 IMAGE_MAPPING_SEPARATOR = "->"
 LOG_FILE = Path(__file__).with_name("anki_ai_runtime.log")

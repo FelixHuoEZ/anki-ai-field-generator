@@ -3,9 +3,9 @@
 # python -m anki-gpt.openai_client_test
 import os
 
-from .note_info import NoteInfo
-from .openai_client import OpenAIClient
-from .prompt_config import PromptConfig
+from .utils.note_info import NoteInfo
+from .providers.openai_client import OpenAIClient
+from .config.prompt_config import PromptConfig
 
 
 USER_PROMPT = '"""{de_word}"""\n\n{de_sentence}\n'

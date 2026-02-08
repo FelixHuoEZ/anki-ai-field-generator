@@ -1,1 +1,1 @@
-from . import gpt_integration
+from .core import gpt_integration

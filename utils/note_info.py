@@ -1,6 +1,6 @@
 from enum import Enum
 
-from .prompt_config import PromptConfig
+from ..config.prompt_config import PromptConfig
 
 
 class LoadStatus(Enum):

@@ -31,10 +31,10 @@ try:
 except Exception:  # pragma: no cover - tests without Anki
     mw = None  # type: ignore
 
-from .config_store import ConfigStore, LLMConfig
+from ..config.config_store import ConfigStore, LLMConfig
 from .mapping_sections import GenerationSection, RetrySection, ToggleMappingEditor
-from .provider_defaults import apply_provider_defaults, reset_button_enabled
-from .provider_options import (
+from ..providers.provider_defaults import apply_provider_defaults, reset_button_enabled
+from ..providers.provider_options import (
     AUDIO_PROVIDERS,
     AUDIO_PROVIDER_DEFAULTS,
     IMAGE_PROVIDERS,
@@ -42,7 +42,7 @@ from .provider_options import (
     TEXT_PROVIDERS,
     TEXT_PROVIDER_DEFAULTS,
 )
-from .settings import SettingsNames, get_settings
+from ..config.settings import SettingsNames, get_settings
 from .user_base_dialog import IMAGE_MAPPING_SEPARATOR
 
 

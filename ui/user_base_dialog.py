@@ -28,8 +28,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont
 
 from .mapping_sections import GenerationSection, RetrySection, ToggleMappingEditor
-from .provider_defaults import apply_provider_defaults, reset_button_enabled
-from .provider_options import (
+from ..providers.provider_defaults import apply_provider_defaults, reset_button_enabled
+from ..providers.provider_options import (
     AUDIO_PROVIDERS,
     AUDIO_PROVIDER_DEFAULTS,
     IMAGE_PROVIDERS,
@@ -37,7 +37,7 @@ from .provider_options import (
     TEXT_PROVIDERS,
     TEXT_PROVIDER_DEFAULTS,
 )
-from .settings import SettingsNames
+from ..config.settings import SettingsNames
 
 IMAGE_MAPPING_SEPARATOR = "->"
 

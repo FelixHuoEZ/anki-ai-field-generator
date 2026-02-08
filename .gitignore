@@ -17,6 +17,9 @@ tmp/
 # Local configuration generated at runtime
 config.json
 config.json.bak
+config-backup/
+config/backups/
+config/*.migrated-*.bak
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

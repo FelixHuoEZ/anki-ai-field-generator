@@ -4,9 +4,9 @@ from typing import Optional
 
 import requests
 
-from .exceptions import ErrorCode, ExternalException
+from ..utils.exceptions import ErrorCode, ExternalException
 from .speech_client import SpeechClient
-from .speech_config import SpeechConfig
+from ..config.speech_config import SpeechConfig
 
 
 class OpenAISpeechClient(SpeechClient):

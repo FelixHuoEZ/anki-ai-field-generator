@@ -10,15 +10,15 @@ from typing import Optional
 import requests
 
 try:
-    from .exceptions import ErrorCode, ExternalException
+    from ..utils.exceptions import ErrorCode, ExternalException
     from .llm_client import LLMClient
-    from .prompt_config import PromptConfig
-    from .response_utils import get_gemini_response_format
+    from ..config.prompt_config import PromptConfig
+    from ..utils.response_utils import get_gemini_response_format
 except ImportError:  # pragma: no cover - allow running outside package context
-    from exceptions import ErrorCode, ExternalException
-    from llm_client import LLMClient
-    from prompt_config import PromptConfig
-    from response_utils import get_gemini_response_format
+    from utils.exceptions import ErrorCode, ExternalException
+    from providers.llm_client import LLMClient
+    from config.prompt_config import PromptConfig
+    from utils.response_utils import get_gemini_response_format
 
 
 class GeminiClient(LLMClient):

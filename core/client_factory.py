@@ -5,24 +5,24 @@ from __future__ import annotations
 import json
 from typing import Callable, Dict, List, Optional
 
-from .claude_client import ClaudeClient
-from .config_manager_dialog import ConfigManagerDialog
-from .config_store import ConfigStore, LLMConfig
-from .custom_client import CustomLLMClient
-from .deepseek_client import DeepseekClient
-from .gemini_client import GeminiClient
-from .gemini_speech_client import GeminiSpeechClient
-from .llm_client import LLMClient
-from .main_window import MainWindow
+from ..providers.claude_client import ClaudeClient
+from ..ui.config_manager_dialog import ConfigManagerDialog
+from ..config.config_store import ConfigStore, LLMConfig
+from ..providers.custom_client import CustomLLMClient
+from ..providers.deepseek_client import DeepseekClient
+from ..providers.gemini_client import GeminiClient
+from ..providers.gemini_speech_client import GeminiSpeechClient
+from ..providers.llm_client import LLMClient
+from ..ui.main_window import MainWindow
 from .note_processor import NoteProcessor
-from .openai_client import OpenAIClient
-from .openai_speech_client import OpenAISpeechClient
-from .prompt_config import PromptConfig
-from .progress_bar import ProgressDialog
-from .settings import SettingsNames, get_settings
-from .speech_client import SpeechClient
-from .speech_config import SpeechConfig
-from .user_base_dialog import UserBaseDialog
+from ..providers.openai_client import OpenAIClient
+from ..providers.openai_speech_client import OpenAISpeechClient
+from ..config.prompt_config import PromptConfig
+from ..ui.progress_bar import ProgressDialog
+from ..config.settings import SettingsNames, get_settings
+from ..providers.speech_client import SpeechClient
+from ..config.speech_config import SpeechConfig
+from ..ui.user_base_dialog import UserBaseDialog
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QTimer
 

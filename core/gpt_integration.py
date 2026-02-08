@@ -13,9 +13,9 @@ from aqt.qt import QAction, QMessageBox, QMenu, QTimer
 from anki import hooks
 
 from .client_factory import ClientFactory
-from .config_manager_dialog import ConfigManagerDialog
-from .prompt_config import PromptConfig
-from .settings import SettingsNames, get_settings
+from ..ui.config_manager_dialog import ConfigManagerDialog
+from ..config.prompt_config import PromptConfig
+from ..config.settings import SettingsNames, get_settings
 from .scheduler import SchedulerManager
 
 

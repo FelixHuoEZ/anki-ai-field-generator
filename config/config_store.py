@@ -179,12 +179,23 @@ class ConfigStore:
     """Manages reading and writing LLM config definitions to disk."""
 
     def __init__(self, config_path: Optional[Path] = None):
-        base_path = Path(__file__).resolve().parent
+        module_path = Path(__file__).resolve().parent
+        # Keep config files at the add-on root for backward compatibility.
+        # Before module re-organization, config.json/config.example.json lived there.
+        base_path = module_path.parent
+        self._legacy_default_path = module_path / CONFIG_FILENAME
         if config_path is not None:
             self._config_path = config_path
             self._using_example = False
         else:
-            self._config_path = base_path / CONFIG_FILENAME
+            default_path = base_path / CONFIG_FILENAME
+            if default_path.exists():
+                self._config_path = default_path
+            elif self._legacy_default_path.exists():
+                # Compatibility fallback for accidentally written config/config.json.
+                self._config_path = self._legacy_default_path
+            else:
+                self._config_path = default_path
             self._using_example = not self._config_path.exists()
             if self._using_example:
                 example_path = base_path / "config.example.json"
@@ -220,7 +231,9 @@ class ConfigStore:
 
     def save(self) -> None:
         target_path = self._config_path
-        if self._config_path.name != CONFIG_FILENAME:
+        if self._config_path == self._legacy_default_path:
+            target_path = self._default_path
+        elif self._config_path.name != CONFIG_FILENAME:
             target_path = self._base_path / CONFIG_FILENAME
         target_path.parent.mkdir(parents=True, exist_ok=True)
         with target_path.open("w", encoding="utf-8") as fh:

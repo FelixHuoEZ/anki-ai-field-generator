@@ -10,7 +10,7 @@ from aqt import gui_hooks, mw
 from aqt.qt import QTimer
 
 from .client_factory import ClientFactory
-from .settings import SettingsNames, get_settings
+from ..config.settings import SettingsNames, get_settings
 
 
 @dataclass
@@ -183,4 +183,3 @@ class _ScheduledBrowserProxy:
 
     def selectedNotes(self) -> list[int]:
         return list(self._note_ids)
-

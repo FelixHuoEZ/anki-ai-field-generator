@@ -3,9 +3,9 @@ from typing import Any
 
 import requests
 
-from .exceptions import ErrorCode, ExternalException
+from ..utils.exceptions import ErrorCode, ExternalException
 from .llm_client import LLMClient
-from .prompt_config import PromptConfig
+from ..config.prompt_config import PromptConfig
 
 
 class CustomLLMClient(LLMClient):

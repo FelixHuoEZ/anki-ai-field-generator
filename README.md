@@ -7,9 +7,9 @@ This is not a standalone script, it's a plugin for Anki which can be downloaded 
 This repository is a fork of [rroessler1/anki-ai-field-generator](https://github.com/rroessler1/anki-ai-field-generator).
 Compared with the upstream project, this fork adds:
 
-- A reusable configuration store (`config_store.py`) that centralises all LLM profiles in `config.json` and auto-creates it when missing.
+- A reusable configuration store (`config/config_store.py`) that centralises all LLM profiles in `config.json` and auto-creates it when missing.
 - Profiles that bind to multiple note types, carry text/image/speech provider choices, and keep the run dialog in sync with the configuration manager.
-- A global configuration manager (`config_manager_dialog.py`) plus menu integration in both the card browser and the Anki Tools/Add-on settings flows.
+- A global configuration manager (`ui/config_manager_dialog.py`) plus menu integration in both the card browser and the Anki Tools/Add-on settings flows.
 - Contributor documentation (`AGENTS.md`) outlining repository structure, coding practices, and review expectations.
 
 ## Project Roles
@@ -26,6 +26,16 @@ Compared with the upstream project, this fork adds:
 - YouGlish/OAAD link helpers: map a source field (default `_word`) to target fields (default `_youglish`/`_oaad`) and batch-generate links from the browser menu or during runs; supports per-config accents and overwrite behavior.
 - Auto-run new notes: when “Auto Run on New Notes” is enabled, newly added cards queue up for the same generation flow and can run silently in the background.
 - Completely free! (You create your own API key and pay for LLM usage)
+
+## Repository Layout
+
+- `__init__.py`: Anki add-on entrypoint, imports `core/gpt_integration.py`.
+- `core/`: runtime orchestration (`client_factory.py`, `gpt_integration.py`, `note_processor.py`, `scheduler.py`).
+- `ui/`: runtime/config windows and shared UI components.
+- `providers/`: text/image/speech provider clients and provider defaults/options.
+- `config/`: persistent config model and settings access (`config_store.py`, `settings.py`, prompts/speech config).
+- `utils/`: shared exceptions, response helpers, and note helper types.
+- `tests/`: unit/smoke scripts for provider and media pipelines.
 
 ## Quickstart:
 1. Install this plugin. (Open Anki. Tools -> Add-ons -> Get Addons -> Enter code: 643253121)
