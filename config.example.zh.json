@@ -2,12 +2,12 @@
   "_meta": {
     "project": "AnkiSpark",
     "fork_of": "rroessler1/anki-ai-field-generator",
-    "generated_from": "local config.json (sanitized)",
-    "privacy_notice": "All secrets and private endpoints are redacted."
+    "generated_from": "本地 config.json（已脱敏）",
+    "privacy_notice": "所有密钥、私有端点与潜在隐私内容均已替换。"
   },
   "configs": [
     {
-      "name": "Default",
+      "name": "默认配置",
       "note_type_ids": [],
       "text_provider": "custom",
       "endpoint": "",
@@ -62,19 +62,19 @@
       "youglish_overwrite": false
     },
     {
-      "name": "hsk-example",
+      "name": "hsk-示例",
       "note_type_ids": [
-        "YOUR_NOTE_TYPE_ID"
+        "你的_NOTE_TYPE_ID"
       ],
       "text_provider": "custom",
-      "endpoint": "https://your-llm-endpoint.example.com/v1/chat/completions",
-      "api_key": "<REDACTED_TEXT_API_KEY>",
+      "endpoint": "https://你的-LLM-端点.example.com/v1/chat/completions",
+      "api_key": "<已隐藏_文本_API_KEY>",
       "model": "openai/gpt-5-mini",
       "text_custom_value": "",
-      "system_prompt": "You are an English-learning assistant. You receive a target word _word and an optional original sentence _sentenceOrig (which may be empty).\n[Output requirements] Return strictly one line of minified JSON, and only that line:\n- Use double quotes for all keys and values. Do not output markdown code blocks or any extra text.\n- No real newlines are allowed inside any value. If a line break is needed, use a literal \\\\n (two characters).\n- Do not use trailing commas. If a quote is needed inside a value, use single quotes.\n[JSON keys and meanings]\n- \"sentenceOrig\": If _sentenceOrig is non-empty, return it as-is; otherwise generate a new sentence. Requirements: (1) must include _word; (2) CEFR B1 level; (3) 8-20 English words; (4) natural grammar, no obscure proper nouns; (5) if _word is a verb, use a common tense and subject; (6) avoid idioms/slang; (7) no real newlines.\n- \"sentenceTran\": A natural Chinese translation of sentenceOrig.\n- \"wordTran\": A concise Chinese meaning of _word, based on the meaning in sentenceOrig.\n- \"definition\": An English definition in 1-2 sentences, no real newlines, based on the meaning in sentenceOrig.\n- \"examplesOrig\": Provide 2 additional English example sentences, joined by a literal \\\\n (example: \"A...\\\\nB...\").\n- \"examplesTran\": Corresponding 2 Chinese translations, joined by a literal \\\\n.\n- \"notes\": One memory tip (no real newlines; can use mnemonic ideas like sound, scene, or word formation).\n- \"phonType\": Part of speech (e.g., v., n., adj.) based on the meaning in sentenceOrig.\n- \"phonetic\": American IPA (e.g., /ˈɑː/; use empty string if uncertain). Prefer Oxford OAAD IPA style. If multiple pronunciations exist, choose the one that matches the meaning in sentenceOrig.\n- \"sentenceMarked\": Return sentenceOrig with every case-matching occurrence of _word wrapped with <mark>...</mark>.\n- \"imagePrompt\": A Chinese prompt for Google Imagen (Nano Banana, Gemini 2.5 Flash Image), in 1-2 sentences, with these constraints:\n    1. White background, 1:1 aspect ratio.\n    2. Style: simple lines, strong color contrast, educational icon style, no text or watermark.\n    3. Clearly express the core meaning or typical scene of _word; may include 1-2 core elements plus supporting action/emotion.\n    4. If the meaning is abstract, use symbols/metaphors/simple scenes to aid memory, but avoid vagueness.\n    5. If part-of-speech or semantic category is obvious, suggest roles (e.g., student, desk, emotion) and key props.\n    6. Do not mention meta words like 'image' or 'icon', and do not include English words or pinyin.\n[Return only] Example (illustrative only, do not copy):\n{\"sentenceOrig\":\"...\",\"sentenceTran\":\"...\",\"wordTran\":\"...\",\"definition\":\"...\",\"examplesOrig\":\"ex1\\\\nex2\",\"examplesTran\":\"trans1\\\\ntrans2\",\"notes\":\"...\",\"phonType\":\"v.\",\"phonetic\":\"/.../\",\"sentenceMarked\":\"...\",\"imagePrompt\":\"...\"}",
-      "user_prompt": "Target word: {_word}\nExisting sentence (optional): {_sentenceOrig}",
+      "system_prompt": "你是英语学习助教。收到目标词 _word，以及可选原句 _sentenceOrig（可能为空）。\n  【输出要求】严格只返回“一行 JSON（minified）”，且仅此一行：\n\n  - 所有键和值均用双引号；不得输出 Markdown 代码块或任何额外文字。\n  - 任意值中禁止真实换行；若需换行，请写成字面量 \\n（两个字符）。\n  - 不得使用尾逗号；若值内需要引号，请用单引号代替。\n\n  【JSON 键名与含义】\n\n  - \"sentenceOrig\"：若 _sentenceOrig 非空则原样返回；否则生成新句子。要求：① 必含_word；② B1 难度；③ 8–20 个英文词；④ 语法自然、无生僻专名；⑤ 若 _word 是动词，选常见时态与主语；⑥ 不用成语/俚语；⑦ 禁止真实换行。\n  - \"sentenceTran\"：_sentenceOrig 的自然中文翻译。\n  - \"wordTran\"：_word 的中文释义（简洁），要根据 _word 在 _sentenceOrig 中的含义来给出。\n  - \"definition\"：英文简释，1–2 句，禁止真实换行，要根据 _word 在 _sentenceOrig 中的含义来给出。\n  - \"examplesOrig\"：再补充 2 条英文例句，用字面量 \\n 连接（示例：\"A...\\nB...\"）。\n  - \"examplesTran\"：对应的 2 条中文翻译，用字面量 \\n 连接。\n  - \"notes\"：1 条记忆提示（禁止真实换行，可结合谐音/场景/构词等）。\n  - \"phonType\"：词性（如 v.、n.、adj. 等），要根据 _word 在 _sentenceOrig 中的含义来给出。\n  - \"phonetic\"：美式音标（如 /ˈɑː/；若不确定可留空字符串），优先使用Oxford的OAAD IPA表示法，如果有多个音标，要根据 _word 在 _sentenceOrig 中的含义来给出。\n  - \"sentenceMarked\"：在 sentenceOrig 中把所有与 _word 大小写一致的部分用 <mark>…</ mark> 包裹后返回。\n  - \"imagePrompt\"：为 Google Imagen（Nano Banana, Gemini 2.5 Flash Image）编写 中文提示词，1–2 句，要求：\n      1. 画面为 白色背景、1:1 比例；\n      2. 风格：线条简洁、配色对比强、教学小图标风、无文字或水印；\n      3. 明确点出 _word 的核心语义或典型场景，可包含 1–2 个核心元素与辅助动作/情绪；\n      4. 如词义抽象，请借助象征、隐喻或简洁场景帮助记忆，但避免过于含糊；\n      5. 若 _word 有明显词性/语义类别，可提示角色（如学生、办公桌、情绪表情等）以及关键道具；\n      6. 禁止提及“图片”“图标”这类元描述，也不要引用英文或拼音。\n\n  【仅返回】如示例（示意，不要照抄内容）：\n  {\"sentenceOrig\":\"...\",\"sentenceTran\":\"...\",\"wordTran\":\"...\",\"definition\":\"...\",\"examplesOrig\":\"ex1\\\\nex2\",\"examplesTran\":\"译1\\\\n译2\",\"notes\":\"...\",\"phonType\":\"v.\",\"phonetic\":\"/.../\",\"sentenceMarked\":\"...\",\"imagePrompt\":\"...\"}",
+      "user_prompt": "目标词：{_word}\n已有原句（可空）：{_sentenceOrig}",
       "text_provider_api_keys": {
-        "custom": "<REDACTED_TEXT_API_KEY>"
+        "custom": "<已隐藏_文本_API_KEY>"
       },
       "response_keys": [
         "phonType",
@@ -106,9 +106,9 @@
         "_imagePrompt->_image::1"
       ],
       "image_provider": "gemini",
-      "image_api_key": "<REDACTED_GEMINI_API_KEY>",
+      "image_api_key": "<已隐藏_GEMINI_API_KEY>",
       "image_provider_api_keys": {
-        "gemini": "<REDACTED_GEMINI_API_KEY>"
+        "gemini": "<已隐藏_GEMINI_API_KEY>"
       },
       "image_endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
       "image_model": "gemini-2.5-flash-image",
@@ -117,10 +117,10 @@
         "_sentenceOrig->_sentenceAudio::1"
       ],
       "audio_provider": "openai",
-      "audio_api_key": "<REDACTED_AUDIO_API_KEY>",
+      "audio_api_key": "<已隐藏_音频_API_KEY>",
       "audio_provider_api_keys": {
-        "gemini": "<REDACTED_GEMINI_API_KEY>",
-        "openai": "<REDACTED_AUDIO_API_KEY>"
+        "gemini": "<已隐藏_GEMINI_API_KEY>",
+        "openai": "<已隐藏_音频_API_KEY>"
       },
       "audio_endpoint": "https://api.openai.com/v1/audio/speech",
       "audio_model": "tts-1",
